@@ -6,15 +6,23 @@
 
 set -e
 
+# Default ports if not set
+export NETTOOLS_PORT=${NETTOOLS_PORT:-8080}
+export NETTOOLS_BACKEND_PORT=${NETTOOLS_BACKEND_PORT:-8000}
+
 echo "============================================"
 echo "  NetTools - Starting..."
+echo "  Port: ${NETTOOLS_PORT} (backend: ${NETTOOLS_BACKEND_PORT})"
 echo "============================================"
 
 # Ensure data directory exists
 mkdir -p /data
 
+# Replace port variable in nginx config
+envsubst '${NETTOOLS_PORT} ${NETTOOLS_BACKEND_PORT}' < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf
+
 # Start nginx in background
-echo "[NetTools] Starting Nginx..."
+echo "[NetTools] Starting Nginx on port ${NETTOOLS_PORT}..."
 nginx -g 'daemon on;'
 
 # Verify Ookla Speedtest CLI
@@ -25,8 +33,8 @@ else
 fi
 
 echo "[NetTools] Starting Backend (uvicorn)..."
-echo "[NetTools] Ready at http://localhost:8080"
+echo "[NetTools] Ready at http://localhost:${NETTOOLS_PORT}"
 echo "============================================"
 
 # Start uvicorn in foreground (main process)
-exec uvicorn main:app --host 0.0.0.0 --port 8000 --log-level info
+exec uvicorn main:app --host 0.0.0.0 --port ${NETTOOLS_BACKEND_PORT} --log-level info

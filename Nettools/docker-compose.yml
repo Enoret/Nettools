@@ -27,8 +27,7 @@ services:
       - nettools-data:/data
     environment:
       - TZ=Europe/Madrid
-    # Port 8080 is exposed via host network
-    # Change in docker/nginx/nginx.conf if needed
+      - NETTOOLS_PORT=8080  # Change to any available port
 
 volumes:
   nettools-data:

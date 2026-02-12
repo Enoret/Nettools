@@ -18,7 +18,7 @@ LABEL maintainer="NetTools"
 LABEL description="NetTools - Network Monitor & Speed Test"
 LABEL org.opencontainers.image.source="https://github.com/mbraut/nettools"
 
-# Install system dependencies (network tools + nginx + Ookla speedtest)
+# Install system dependencies (network tools + nginx)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     nginx \
     arp-scan \
@@ -29,27 +29,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     dnsutils \
     curl \
     gnupg \
+    gettext-base \
     && rm -rf /var/lib/apt/lists/*
-
-# Install official Ookla Speedtest CLI
-RUN ARCH=$(dpkg --print-architecture) && \
-    case "$ARCH" in \
-        amd64) OOKLA_ARCH="x86_64" ;; \
-        arm64) OOKLA_ARCH="aarch64" ;; \
-        armhf) OOKLA_ARCH="armhf" ;; \
-        i386)  OOKLA_ARCH="i386" ;; \
-        *)     OOKLA_ARCH="x86_64" ;; \
-    esac && \
-    curl -sL "https://install.speedtest.net/app/cli/ookla-speedtest-1.2.0-linux-${OOKLA_ARCH}.tgz" -o /tmp/speedtest.tgz && \
-    tar xzf /tmp/speedtest.tgz -C /tmp/ && \
-    cp /tmp/speedtest /usr/local/bin/speedtest && \
-    chmod +x /usr/local/bin/speedtest && \
-    rm -rf /tmp/speedtest* && \
-    echo "Ookla Speedtest CLI installed"
 
 # Copy Python packages from build stage
 COPY --from=backend-build /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=backend-build /usr/local/bin /usr/local/bin
+
+# Remove pip's speedtest wrapper (conflicts with Ookla binary)
+RUN rm -f /usr/local/bin/speedtest /usr/local/bin/speedtest-cli
+
+# Install official Ookla Speedtest CLI
+RUN curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | bash && \
+    apt-get install -y speedtest && \
+    rm -rf /var/lib/apt/lists/* && \
+    speedtest --version && \
+    echo "Ookla Speedtest CLI installed"
 
 # Setup backend
 WORKDIR /app
@@ -59,10 +54,10 @@ COPY docker/backend/requirements.txt .
 # Setup frontend
 COPY nettools/ /usr/share/nginx/html/
 
-# Nginx configuration
-COPY docker/nginx/nginx.conf /etc/nginx/conf.d/default.conf
+# Nginx configuration (template - port replaced at runtime by entrypoint)
+COPY docker/nginx/nginx.conf /etc/nginx/conf.d/default.conf.template
 # Remove default nginx site to avoid conflicts
-RUN rm -f /etc/nginx/sites-enabled/default
+RUN rm -f /etc/nginx/sites-enabled/default /etc/nginx/conf.d/default.conf
 
 # Create data directory
 RUN mkdir -p /data
@@ -75,13 +70,15 @@ RUN chmod +x /entrypoint.sh
 ENV NETTOOLS_DB_PATH=/data/nettools.db
 ENV PYTHONUNBUFFERED=1
 ENV TZ=Europe/Madrid
+ENV NETTOOLS_PORT=8080
+ENV NETTOOLS_BACKEND_PORT=8000
 
-# Expose port (nginx)
+# Expose port (nginx - configurable via NETTOOLS_PORT)
 EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD curl -sf http://localhost:8000/api/health || exit 1
+    CMD curl -sf http://localhost:${NETTOOLS_BACKEND_PORT}/api/health || exit 1
 
 # Volume for persistent data
 VOLUME ["/data"]
