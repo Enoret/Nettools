@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="nettools/assets/logo.svg" alt="NetTools Logo" width="80" height="80">
+  <img src="Nettools/nettools/assets/logo.svg" alt="NetTools Logo" width="80" height="80">
 </p>
 
 <h1 align="center">NetTools</h1>
