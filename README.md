@@ -95,6 +95,8 @@ docker run -d \
   --network host \
   -v nettools-data:/data \
   -e TZ=Europe/Madrid \
+  -e NETTOOLS_PORT=8080 \
+  -e NETTOOLS_BACKEND_PORT=8000 \
   --restart unless-stopped \
   mbraut/nettools:latest
 ```
@@ -102,8 +104,6 @@ docker run -d \
 ### Docker Compose
 
 ```yaml
-version: "3.8"
-
 services:
   nettools:
     image: mbraut/nettools:latest
@@ -114,13 +114,12 @@ services:
       - nettools-data:/data
     environment:
       - TZ=Europe/Madrid
-      - NETTOOLS_PORT=6060
-      - NETTOOLS_BACKEND_PORT=6061
+      - NETTOOLS_PORT=8080        # Web UI port
+      - NETTOOLS_BACKEND_PORT=8000 # API backend port (internal)
 
 volumes:
   nettools-data:
     driver: local
-
 ```
 
 ```bash
@@ -228,17 +227,17 @@ systemctl restart nettools
 ## Architecture
 
 ```
-                    Port 8080
+              NETTOOLS_PORT (default 8080)
                         |
                     [ Nginx ]
                     /       \
               Static       /api/*
             (Frontend)        |
-                        [ Uvicorn ]
-                        (FastAPI)
-                            |
-                     [ SQLite DB ]
-                      /data/nettools.db
+                    [ Uvicorn :NETTOOLS_BACKEND_PORT ]
+                           (FastAPI)
+                              |
+                       [ SQLite DB ]
+                        /data/nettools.db
 ```
 
 | Component | Technology |
@@ -273,7 +272,7 @@ systemctl restart nettools
 
 ## API
 
-The backend exposes a REST API on port 8000, accessible via Nginx at `/api/`.
+The backend exposes a REST API accessible via Nginx at `/api/`. The backend port is configurable via `NETTOOLS_BACKEND_PORT` (default: 8000).
 
 ### Speed Test
 
@@ -351,6 +350,8 @@ To backup, simply copy the `/data/nettools.db` file.
 
 | Variable | Default | Description |
 |---|---|---|
+| `NETTOOLS_PORT` | `8080` | Web UI port |
+| `NETTOOLS_BACKEND_PORT` | `8000` | API backend port (internal) |
 | `NETTOOLS_DB_PATH` | `/data/nettools.db` | Database path |
 | `TZ` | `Europe/Madrid` | Container timezone |
 | `PYTHONUNBUFFERED` | `1` | Real-time logs |
