@@ -251,12 +251,18 @@ systemctl restart nettools
 
 ## Screenshots
 
-<!-- Add your screenshots here -->
-<!-- ![Net Speed](docs/screenshots/netspeed.png) -->
-<!-- ![Net Alert](docs/screenshots/netalert.png) -->
-<!-- ![Net Check](docs/screenshots/netcheck.png) -->
+### Net Speed
+![Net Speed](screenshots/NetSpeed.png)
 
-*Coming soon*
+### Net Alert
+![Net Alert - Devices](screenshots/NetAlert0.png)
+![Net Alert - Details](screenshots/NetAlert1.png)
+
+### Net Check
+![Net Check](screenshots/NetCheck.png)
+
+### Settings
+![Settings](screenshots/Settings.png)
 
 ---
 
