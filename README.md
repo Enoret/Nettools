@@ -102,6 +102,8 @@ docker run -d \
 ### Docker Compose
 
 ```yaml
+version: "3.8"
+
 services:
   nettools:
     image: mbraut/nettools:latest
@@ -112,10 +114,13 @@ services:
       - nettools-data:/data
     environment:
       - TZ=Europe/Madrid
+      - NETTOOLS_PORT=6060
+      - NETTOOLS_BACKEND_PORT=6061
 
 volumes:
   nettools-data:
     driver: local
+
 ```
 
 ```bash
