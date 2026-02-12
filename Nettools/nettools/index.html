@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="system">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetTools - Monitor de Red</title>
+    <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.1.0/fonts/remixicon.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <div class="logo-icon">
+                    <i class="ri-global-line"></i>
+                </div>
+                <span class="logo-text">NetTools</span>
+            </div>
+            <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+                <i class="ri-menu-fold-line"></i>
+            </button>
+        </div>
+
+        <nav class="sidebar-nav">
+            <ul>
+                <li>
+                    <a href="#" class="nav-link active" data-page="speed">
+                        <i class="ri-speed-up-line"></i>
+                        <span>Net Speed</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="nav-link" data-page="network">
+                        <i class="ri-radar-line"></i>
+                        <span>Net Alert</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="nav-link" data-page="netcheck">
+                        <i class="ri-shield-check-line"></i>
+                        <span>Net Check</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+
+        <div class="sidebar-settings-link">
+            <a href="#" class="nav-link" data-page="settings">
+                <i class="ri-settings-3-line"></i>
+                <span>Ajustes</span>
+            </a>
+        </div>
+
+        <div class="sidebar-footer">
+            <div class="theme-switcher">
+                <button class="theme-btn" data-theme="light" title="Tema Claro">
+                    <i class="ri-sun-line"></i>
+                </button>
+                <button class="theme-btn active" data-theme="system" title="Tema del Sistema">
+                    <i class="ri-computer-line"></i>
+                </button>
+                <button class="theme-btn" data-theme="dark" title="Tema Oscuro">
+                    <i class="ri-moon-line"></i>
+                </button>
+            </div>
+            <div class="sidebar-version">v1.0.0</div>
+            <div class="sidebar-credit"><a href="https://bytebeat.es" target="_blank">bytebeat.es</a></div>
+        </div>
+    </aside>
+
+    <!-- Mobile overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- Main content -->
+    <main class="main-content" id="mainContent">
+        <!-- Top bar -->
+        <header class="topbar">
+            <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Menu">
+                <i class="ri-menu-line"></i>
+            </button>
+            <div class="topbar-title" id="topbarTitle">
+                <i class="ri-speed-up-line"></i>
+                <h1>Net Speed</h1>
+            </div>
+            <div class="topbar-actions">
+                <span class="auto-status-indicator" id="autoStatusIndicator">
+                    <i class="ri-refresh-line"></i>
+                    <span id="autoStatusText">Cargando...</span>
+                </span>
+                <div class="topbar-separator"></div>
+                <div class="connection-status" id="connectionStatus">
+                    <span class="status-dot online"></span>
+                    <span class="status-text">Conectado</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Page: Net Speed -->
+        <section class="page active" id="page-speed">
+            <!-- Speed Test Hero -->
+            <div class="speed-hero">
+                <div class="speed-gauges">
+                    <div class="gauge-card">
+                        <div class="gauge-label">Descarga</div>
+                        <div id="gaugeDownload" class="gauge-chart"></div>
+                        <div class="gauge-value" id="downloadValue">--</div>
+                        <div class="gauge-unit">Mbps</div>
+                    </div>
+                    <div class="gauge-card main-gauge">
+                        <button class="start-test-btn" id="startTestBtn">
+                            <div class="btn-inner">
+                                <i class="ri-play-fill" id="startTestIcon"></i>
+                                <span id="startTestText">INICIAR</span>
+                            </div>
+                            <svg class="btn-progress" viewBox="0 0 120 120">
+                                <circle class="progress-bg" cx="60" cy="60" r="54"></circle>
+                                <circle class="progress-fill" cx="60" cy="60" r="54" id="testProgress"></circle>
+                            </svg>
+                        </button>
+                        <div class="test-phase" id="testPhase">Listo para iniciar</div>
+                    </div>
+                    <div class="gauge-card">
+                        <div class="gauge-label">Subida</div>
+                        <div id="gaugeUpload" class="gauge-chart"></div>
+                        <div class="gauge-value" id="uploadValue">--</div>
+                        <div class="gauge-unit">Mbps</div>
+                    </div>
+                </div>
+
+                <!-- Live metrics during test -->
+                <!-- Server selector -->
+                <div class="server-selector">
+                    <label><i class="ri-server-line"></i> Servidor:</label>
+                    <select class="select" id="serverSelect">
+                        <option value="">Automatico (mejor servidor)</option>
+                    </select>
+                    <button class="btn btn-secondary btn-sm" id="refreshServersBtn" title="Actualizar lista de servidores">
+                        <i class="ri-refresh-line"></i>
+                    </button>
+                </div>
+
+                <div class="live-metrics" id="liveMetrics">
+                    <div class="metric-pill">
+                        <i class="ri-timer-line"></i>
+                        <span>Ping</span>
+                        <strong id="livePing">-- ms</strong>
+                    </div>
+                    <div class="metric-pill">
+                        <i class="ri-bar-chart-line"></i>
+                        <span>Jitter</span>
+                        <strong id="liveJitter">-- ms</strong>
+                    </div>
+                    <div class="metric-pill">
+                        <i class="ri-server-line"></i>
+                        <span>Servidor</span>
+                        <strong id="liveServer">--</strong>
+                    </div>
+                    <div class="metric-pill">
+                        <i class="ri-building-line"></i>
+                        <span>ISP</span>
+                        <strong id="liveISP">--</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-icon download">
+                        <i class="ri-download-2-line"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Mejor Descarga</span>
+                        <span class="stat-value" id="bestDownload">-- Mbps</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon upload">
+                        <i class="ri-upload-2-line"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Mejor Subida</span>
+                        <span class="stat-value" id="bestUpload">-- Mbps</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon ping">
+                        <i class="ri-timer-line"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Mejor Ping</span>
+                        <span class="stat-value" id="bestPing">-- ms</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon tests">
+                        <i class="ri-line-chart-line"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Tests Totales</span>
+                        <span class="stat-value" id="totalTests">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="charts-grid">
+                <div class="chart-card wide">
+                    <div class="chart-header">
+                        <h3>Historial de Velocidad</h3>
+                        <div class="chart-filters">
+                            <button class="filter-btn active" data-range="24h">24h</button>
+                            <button class="filter-btn" data-range="7d">7d</button>
+                            <button class="filter-btn" data-range="30d">30d</button>
+                            <button class="filter-btn" data-range="all">Todo</button>
+                        </div>
+                    </div>
+                    <div id="chartSpeedHistory" class="chart-container"></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>Latencia (Ping)</h3>
+                    </div>
+                    <div id="chartPingHistory" class="chart-container"></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>Promedio por Hora</h3>
+                    </div>
+                    <div id="chartHourlyAvg" class="chart-container"></div>
+                </div>
+            </div>
+
+            <!-- Recent Tests Table -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h3><i class="ri-history-line"></i> Tests Recientes</h3>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table" id="recentTestsTable">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Descarga</th>
+                                <th>Subida</th>
+                                <th>Ping</th>
+                                <th>Jitter</th>
+                                <th>Servidor</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentTestsBody">
+                            <tr>
+                                <td colspan="6" class="table-empty">No hay tests registrados</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Page: Net Check -->
+        <section class="page" id="page-netcheck">
+            <!-- Ping Section -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h3><i class="ri-radar-line"></i> Ping de Red</h3>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn btn-secondary" id="pingAllBtn" title="Hace ping a todos los dispositivos guardados en Net Alert">
+                            <i class="ri-refresh-line"></i> Ping a Todos
+                        </button>
+                        <button class="btn btn-secondary" id="clearPingBtn" title="Limpiar resultados de ping">
+                            <i class="ri-delete-bin-line"></i> Limpiar
+                        </button>
+                    </div>
+                </div>
+                <div class="ping-toolbar">
+                    <div class="input-group">
+                        <input type="text" id="pingInput" placeholder="Introduce IP (ej: 192.168.1.1)" class="input">
+                        <button class="btn btn-primary" id="pingBtn">
+                            <i class="ri-send-plane-line"></i> Ping
+                        </button>
+                    </div>
+                </div>
+                <div class="ping-results" id="pingResults">
+                    <div class="empty-state small">
+                        <i class="ri-wifi-off-line"></i>
+                        <p>Introduce una IP o haz ping a todos los dispositivos guardados</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Traceroute Section -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h3><i class="ri-route-line"></i> Traceroute</h3>
+                    <button class="btn btn-secondary" id="clearTracerouteBtn" title="Limpiar resultado">
+                        <i class="ri-delete-bin-line"></i> Limpiar
+                    </button>
+                </div>
+                <div class="traceroute-toolbar">
+                    <div class="input-group">
+                        <input type="text" id="tracerouteInput" placeholder="IP o dominio (ej: 8.8.8.8, google.com)" class="input">
+                        <button class="btn btn-primary" id="tracerouteBtn">
+                            <i class="ri-route-line"></i> Trazar Ruta
+                        </button>
+                    </div>
+                    <div class="traceroute-presets">
+                        <button class="btn btn-sm btn-secondary traceroute-preset" data-target="gateway">
+                            <i class="ri-router-line"></i> Gateway
+                        </button>
+                        <button class="btn btn-sm btn-secondary traceroute-preset" data-target="8.8.8.8">
+                            <i class="ri-google-line"></i> Google DNS
+                        </button>
+                        <button class="btn btn-sm btn-secondary traceroute-preset" data-target="1.1.1.1">
+                            <i class="ri-cloud-line"></i> Cloudflare
+                        </button>
+                        <button class="btn btn-sm btn-secondary traceroute-preset" data-target="208.67.222.222">
+                            <i class="ri-shield-line"></i> OpenDNS
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Traceroute Progress -->
+                <div class="traceroute-progress hidden" id="tracerouteProgress">
+                    <div class="scan-bar">
+                        <div class="scan-fill traceroute-fill" id="tracerouteFill"></div>
+                    </div>
+                    <span class="scan-text" id="tracerouteStatus">Trazando ruta...</span>
+                </div>
+
+                <!-- Traceroute Visual Map -->
+                <div class="traceroute-map-container" id="tracerouteMapContainer">
+                    <div class="empty-state small">
+                        <i class="ri-route-line"></i>
+                        <p>Introduce una IP o dominio para trazar la ruta de red</p>
+                    </div>
+                </div>
+
+                <!-- Traceroute Hops Table -->
+                <div class="traceroute-table-container hidden" id="tracerouteTableContainer">
+                    <table class="data-table" id="tracerouteTable">
+                        <thead>
+                            <tr>
+                                <th>Salto</th>
+                                <th>IP</th>
+                                <th>Latencia Min</th>
+                                <th>Latencia Media</th>
+                                <th>Latencia Max</th>
+                                <th>Perdida</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tracerouteTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- NSLookup Section -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h3><i class="ri-search-eye-line"></i> NSLookup / DNS</h3>
+                    <button class="btn btn-secondary" id="clearNslookupBtn" title="Limpiar resultado">
+                        <i class="ri-delete-bin-line"></i> Limpiar
+                    </button>
+                </div>
+                <div class="nslookup-toolbar">
+                    <div class="input-group">
+                        <input type="text" id="nslookupInput" placeholder="Dominio o IP (ej: google.com, 8.8.8.8)" class="input">
+                        <select id="nslookupType" class="input nslookup-type-select">
+                            <option value="A">A (IPv4)</option>
+                            <option value="AAAA">AAAA (IPv6)</option>
+                            <option value="MX">MX (Correo)</option>
+                            <option value="NS">NS (Nombre)</option>
+                            <option value="TXT">TXT</option>
+                            <option value="CNAME">CNAME</option>
+                            <option value="SOA">SOA</option>
+                            <option value="PTR">PTR (Reverso)</option>
+                            <option value="SRV">SRV</option>
+                            <option value="ANY">ANY (Todos)</option>
+                        </select>
+                        <button class="btn btn-primary" id="nslookupBtn">
+                            <i class="ri-search-eye-line"></i> Consultar
+                        </button>
+                    </div>
+                    <div class="nslookup-options">
+                        <div class="input-group input-group-sm">
+                            <label class="nslookup-label">Servidor DNS:</label>
+                            <input type="text" id="nslookupServer" placeholder="Por defecto (del sistema)" class="input input-sm">
+                        </div>
+                        <div class="nslookup-presets">
+                            <button class="btn btn-sm btn-secondary nslookup-preset" data-server="">
+                                <i class="ri-computer-line"></i> Sistema
+                            </button>
+                            <button class="btn btn-sm btn-secondary nslookup-preset" data-server="8.8.8.8">
+                                <i class="ri-google-line"></i> Google
+                            </button>
+                            <button class="btn btn-sm btn-secondary nslookup-preset" data-server="1.1.1.1">
+                                <i class="ri-cloud-line"></i> Cloudflare
+                            </button>
+                            <button class="btn btn-sm btn-secondary nslookup-preset" data-server="208.67.222.222">
+                                <i class="ri-shield-line"></i> OpenDNS
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NSLookup Results -->
+                <div class="nslookup-results" id="nslookupResults">
+                    <div class="empty-state small">
+                        <i class="ri-search-eye-line"></i>
+                        <p>Introduce un dominio o IP para consultar registros DNS</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Page: Net Alert / Network -->
+        <section class="page" id="page-network">
+            <!-- Device History Chart -->
+            <div class="section-card device-history-card">
+                <div class="section-header">
+                    <h3><i class="ri-line-chart-line"></i> Historial de Dispositivos</h3>
+                    <div class="chart-range-selector">
+                        <button class="btn btn-sm btn-secondary chart-range-btn" data-range="1h">1h</button>
+                        <button class="btn btn-sm btn-secondary chart-range-btn" data-range="6h">6h</button>
+                        <button class="btn btn-sm btn-secondary chart-range-btn active" data-range="24h">24h</button>
+                        <button class="btn btn-sm btn-secondary chart-range-btn" data-range="7d">7d</button>
+                        <button class="btn btn-sm btn-secondary chart-range-btn" data-range="30d">30d</button>
+                    </div>
+                </div>
+                <div id="deviceHistoryChart" class="device-history-chart"></div>
+            </div>
+
+            <!-- Network Stats -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-icon devices">
+                        <i class="ri-device-line"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Total Dispositivos</span>
+                        <span class="stat-value" id="totalDevices">0</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon online">
+                        <i class="ri-wifi-line"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">En Linea</span>
+                        <span class="stat-value" id="onlineDevices">0</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon offline">
+                        <i class="ri-wifi-off-line"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Desconectados</span>
+                        <span class="stat-value" id="offlineDevices">0</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon new-device">
+                        <i class="ri-alarm-warning-line"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Nuevos</span>
+                        <span class="stat-value" id="newDevices">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Toolbar -->
+            <div class="section-card">
+                <div class="network-toolbar">
+                    <div class="toolbar-left">
+                        <div class="search-box">
+                            <i class="ri-search-line"></i>
+                            <input type="text" id="deviceSearch" placeholder="Buscar dispositivo..." class="input">
+                        </div>
+                        <div class="filter-group">
+                            <button class="filter-btn active" data-filter="all">Todos</button>
+                            <button class="filter-btn" data-filter="online">En linea</button>
+                            <button class="filter-btn" data-filter="offline">Desconectados</button>
+                            <button class="filter-btn" data-filter="new">Nuevos</button>
+                            <button class="filter-btn" data-filter="saved">Guardados</button>
+                            <button class="filter-btn" data-filter="manual">Manuales</button>
+                        </div>
+                    </div>
+                    <div class="toolbar-right">
+                        <button class="btn btn-secondary" id="scanNetworkBtn">
+                            <i class="ri-radar-line"></i> Escanear Red
+                        </button>
+                        <button class="btn btn-primary" id="addDeviceBtn">
+                            <i class="ri-add-line"></i> Nuevo Dispositivo
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scan Progress -->
+            <div class="scan-progress hidden" id="scanProgress">
+                <div class="scan-bar">
+                    <div class="scan-fill" id="scanFill"></div>
+                </div>
+                <span class="scan-text" id="scanText">Escaneando red...</span>
+            </div>
+
+            <!-- Devices Grid -->
+            <div class="devices-grid" id="devicesGrid">
+                <div class="empty-state">
+                    <i class="ri-radar-line"></i>
+                    <h3>Sin dispositivos</h3>
+                    <p>Escanea la red o registra dispositivos manualmente</p>
+                    <button class="btn btn-primary" onclick="document.getElementById('scanNetworkBtn').click()">
+                        <i class="ri-radar-line"></i> Escanear Ahora
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Page: Settings -->
+        <section class="page" id="page-settings">
+            <div class="settings-grid">
+                <!-- Speed Test Settings -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <h3><i class="ri-speed-up-line"></i> Test de Velocidad</h3>
+                    </div>
+                    <div class="setting-group">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Test Automatico</label>
+                                <p>Ejecutar test de velocidad automaticamente</p>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="autoSpeedTest" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Frecuencia del Test</label>
+                                <p>Cada cuanto se ejecuta un test automatico</p>
+                            </div>
+                            <select class="select" id="speedTestFrequency">
+                                <option value="15">Cada 15 minutos</option>
+                                <option value="30">Cada 30 minutos</option>
+                                <option value="60" selected>Cada hora</option>
+                                <option value="120">Cada 2 horas</option>
+                                <option value="360">Cada 6 horas</option>
+                                <option value="720">Cada 12 horas</option>
+                                <option value="1440">Cada 24 horas</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Retener Historial</label>
+                                <p>Tiempo que se conservan los resultados</p>
+                            </div>
+                            <select class="select" id="speedTestRetention">
+                                <option value="7">7 dias</option>
+                                <option value="30" selected>30 dias</option>
+                                <option value="90">90 dias</option>
+                                <option value="180">6 meses</option>
+                                <option value="365">1 ano</option>
+                                <option value="0">Siempre</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- General Settings -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <h3><i class="ri-global-line"></i> General</h3>
+                    </div>
+                    <div class="setting-group">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Zona Horaria</label>
+                                <p>Ajusta la hora de los registros y graficos</p>
+                            </div>
+                            <select class="select" id="timezoneSelect">
+                                <option value="-12">UTC-12 (Baker Island)</option>
+                                <option value="-11">UTC-11 (Samoa)</option>
+                                <option value="-10">UTC-10 (Hawai)</option>
+                                <option value="-9">UTC-9 (Alaska)</option>
+                                <option value="-8">UTC-8 (Pacifico US)</option>
+                                <option value="-7">UTC-7 (Montana US)</option>
+                                <option value="-6">UTC-6 (Centro US/Mexico)</option>
+                                <option value="-5">UTC-5 (Este US/Colombia)</option>
+                                <option value="-4">UTC-4 (Venezuela/Bolivia)</option>
+                                <option value="-3">UTC-3 (Argentina/Brasil)</option>
+                                <option value="-2">UTC-2 (Atlantico Sur)</option>
+                                <option value="-1">UTC-1 (Azores)</option>
+                                <option value="0">UTC+0 (Londres/Lisboa)</option>
+                                <option value="1" selected>UTC+1 (Madrid/Paris/Berlin)</option>
+                                <option value="2">UTC+2 (Atenas/Helsinki/Cairo)</option>
+                                <option value="3">UTC+3 (Moscu/Estambul)</option>
+                                <option value="4">UTC+4 (Dubai)</option>
+                                <option value="5">UTC+5 (Karachi)</option>
+                                <option value="6">UTC+6 (Dacca)</option>
+                                <option value="7">UTC+7 (Bangkok)</option>
+                                <option value="8">UTC+8 (Pekin/Singapur)</option>
+                                <option value="9">UTC+9 (Tokio/Seul)</option>
+                                <option value="10">UTC+10 (Sidney)</option>
+                                <option value="11">UTC+11 (Noumea)</option>
+                                <option value="12">UTC+12 (Auckland)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Network Scan Settings -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <h3><i class="ri-radar-line"></i> Escaneo de Red</h3>
+                    </div>
+                    <div class="setting-group">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Escaneo Automatico</label>
+                                <p>Escanear la red automaticamente</p>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="autoNetworkScan" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Frecuencia del Escaneo</label>
+                                <p>Cada cuanto se escanea la red</p>
+                            </div>
+                            <select class="select" id="networkScanFrequency">
+                                <option value="5">Cada 5 minutos</option>
+                                <option value="15" selected>Cada 15 minutos</option>
+                                <option value="30">Cada 30 minutos</option>
+                                <option value="60">Cada hora</option>
+                                <option value="120">Cada 2 horas</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Rango de Red</label>
+                                <p>Subred a escanear (CIDR)</p>
+                            </div>
+                            <input type="text" class="input" id="networkRange" placeholder="192.168.1.0/24" value="192.168.1.0/24">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Notificar Nuevos Dispositivos</label>
+                                <p>Alertar cuando se detecte un dispositivo nuevo</p>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="notifyNewDevices" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Telegram Notifications -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <h3><i class="ri-telegram-line"></i> Notificaciones Telegram</h3>
+                    </div>
+                    <div class="setting-group">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Activar Telegram</label>
+                                <p>Enviar notificaciones al detectar nuevos dispositivos</p>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="telegramEnabled">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Bot Token</label>
+                                <p>Token del bot de Telegram (obtenlo con @BotFather)</p>
+                            </div>
+                            <input type="text" class="input" id="telegramBotToken" placeholder="123456789:ABCdefGHI..." autocomplete="off">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Chat ID</label>
+                                <p>ID del chat o grupo donde enviar alertas</p>
+                            </div>
+                            <input type="text" class="input" id="telegramChatId" placeholder="-1001234567890" autocomplete="off">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Probar Conexion</label>
+                                <p>Enviar un mensaje de prueba para verificar la configuracion</p>
+                            </div>
+                            <button class="btn btn-secondary" id="testTelegramBtn">
+                                <i class="ri-send-plane-line"></i> Enviar Prueba
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Color Customization -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <h3><i class="ri-palette-line"></i> Personalizacion de Colores</h3>
+                    </div>
+                    <div class="setting-group">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Color Principal</label>
+                                <p>Color de acento de la interfaz</p>
+                            </div>
+                            <div class="color-picker-group">
+                                <div class="color-picker-wrapper">
+                                    <input type="color" id="accentColorPicker" value="#ffa801">
+                                </div>
+                                <input type="text" class="input color-hex-input" id="accentColorHex" value="#ffa801" maxlength="7">
+                                <button class="color-reset-btn" id="resetAccentColor" title="Restablecer">
+                                    <i class="ri-refresh-line"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Color de Fondo</label>
+                                <p>Color del fondo principal</p>
+                            </div>
+                            <div class="color-picker-group">
+                                <div class="color-picker-wrapper">
+                                    <input type="color" id="bgColorPicker" value="#f1f5f9">
+                                </div>
+                                <input type="text" class="input color-hex-input" id="bgColorHex" value="#f1f5f9" maxlength="7">
+                                <button class="color-reset-btn" id="resetBgColor" title="Restablecer">
+                                    <i class="ri-refresh-line"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Color de Descarga</label>
+                                <p>Color de los graficos de descarga</p>
+                            </div>
+                            <div class="color-picker-group">
+                                <div class="color-picker-wrapper">
+                                    <input type="color" id="downloadColorPicker" value="#3b82f6">
+                                </div>
+                                <input type="text" class="input color-hex-input" id="downloadColorHex" value="#3b82f6" maxlength="7">
+                                <button class="color-reset-btn" id="resetDownloadColor" title="Restablecer">
+                                    <i class="ri-refresh-line"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Color de Subida</label>
+                                <p>Color de los graficos de subida</p>
+                            </div>
+                            <div class="color-picker-group">
+                                <div class="color-picker-wrapper">
+                                    <input type="color" id="uploadColorPicker" value="#8b5cf6">
+                                </div>
+                                <input type="text" class="input color-hex-input" id="uploadColorHex" value="#8b5cf6" maxlength="7">
+                                <button class="color-reset-btn" id="resetUploadColor" title="Restablecer">
+                                    <i class="ri-refresh-line"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Management -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <h3><i class="ri-database-2-line"></i> Datos</h3>
+                    </div>
+                    <div class="setting-group">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Exportar Datos</label>
+                                <p>Descargar todos los datos en formato JSON</p>
+                            </div>
+                            <button class="btn btn-secondary" id="exportDataBtn">
+                                <i class="ri-download-line"></i> Exportar
+                            </button>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Limpiar Historial de Tests</label>
+                                <p>Eliminar todos los resultados de tests</p>
+                            </div>
+                            <button class="btn btn-danger" id="clearTestsBtn">
+                                <i class="ri-delete-bin-line"></i> Limpiar
+                            </button>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Reiniciar Dispositivos</label>
+                                <p>Eliminar todos los dispositivos descubiertos</p>
+                            </div>
+                            <button class="btn btn-danger" id="clearDevicesBtn">
+                                <i class="ri-delete-bin-line"></i> Reiniciar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- About -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <h3><i class="ri-information-line"></i> Acerca de</h3>
+                    </div>
+                    <div class="about-info">
+                        <div class="about-logo">
+                            <div class="logo-icon large">
+                                <i class="ri-global-line"></i>
+                            </div>
+                            <h2>NetTools</h2>
+                            <p class="version">Version 1.0.0</p>
+                            <p class="about-developer">Desarrollado por <a href="https://bytebeat.es" target="_blank">bytebeat.es</a></p>
+                        </div>
+                        <div class="about-details">
+                            <div class="about-row">
+                                <span>Backend</span>
+                                <span>Python FastAPI</span>
+                            </div>
+                            <div class="about-row">
+                                <span>Base de Datos</span>
+                                <span>SQLite</span>
+                            </div>
+                            <div class="about-row">
+                                <span>Motor de Speed Test</span>
+                                <span>Ookla Speedtest CLI</span>
+                            </div>
+                            <div class="about-row">
+                                <span>Escaneo de Red</span>
+                                <span>arp-scan / nmap</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Save Settings Button -->
+                <div class="settings-actions">
+                    <button class="btn btn-primary btn-lg" id="saveSettingsBtn">
+                        <i class="ri-save-line"></i> Guardar Configuracion
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Device Edit Modal -->
+    <div class="modal-overlay" id="deviceModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modalTitle">Editar Dispositivo</h3>
+                <button class="modal-close" id="modalClose">
+                    <i class="ri-close-line"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="deviceId">
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input type="text" class="input" id="deviceName" placeholder="Ej: Router Principal">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Direccion IP</label>
+                        <input type="text" class="input" id="deviceIP" placeholder="192.168.1.1">
+                    </div>
+                    <div class="form-group">
+                        <label>Direccion MAC</label>
+                        <input type="text" class="input" id="deviceMAC" placeholder="AA:BB:CC:DD:EE:FF">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Tipo de IP</label>
+                    <select class="select" id="deviceIpType">
+                        <option value="dhcp">DHCP (Dinamica)</option>
+                        <option value="static">Estatica</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Marca / Fabricante</label>
+                    <input type="text" class="input" id="deviceBrand" placeholder="Ej: TP-Link, Cisco, etc.">
+                </div>
+                <div class="form-group">
+                    <label>Descripcion</label>
+                    <textarea class="input textarea" id="deviceDescription" placeholder="Ej: Router WiFi del salon" rows="2"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Ubicacion</label>
+                    <input type="text" class="input" id="deviceLocation" placeholder="Ej: Salon, Oficina, Rack A3...">
+                </div>
+                <div class="form-group">
+                    <label>Tipo</label>
+                    <select class="select" id="deviceType">
+                        <option value="other">Otro</option>
+                        <option value="router">Router</option>
+                        <option value="switch">Switch</option>
+                        <option value="ap">Punto de Acceso</option>
+                        <option value="server">Servidor</option>
+                        <option value="desktop">PC / Escritorio</option>
+                        <option value="laptop">Portatil</option>
+                        <option value="phone">Telefono</option>
+                        <option value="tablet">Tablet</option>
+                        <option value="printer">Impresora</option>
+                        <option value="camera">Camara IP</option>
+                        <option value="iot">IoT / Smart Home</option>
+                        <option value="nas">NAS / Almacenamiento</option>
+                        <option value="tv">Smart TV / Streaming</option>
+                        <option value="gaming">Consola / Gaming</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="modalCancel">Cancelar</button>
+                <button class="btn btn-primary" id="modalSave">
+                    <i class="ri-save-line"></i> Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Confirm Dialog -->
+    <div class="modal-overlay" id="confirmModal">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <h3 id="confirmTitle">Confirmar</h3>
+                <button class="modal-close" onclick="closeConfirm()">
+                    <i class="ri-close-line"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="confirmMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeConfirm()">Cancelar</button>
+                <button class="btn btn-danger" id="confirmAction">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/speedtest.js"></script>
+    <script src="js/netcheck.js"></script>
+    <script src="js/network.js"></script>
+    <script src="js/settings.js"></script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+# =========================================
+#  NetTools - Docker Compose
+#  Single container: Backend + Frontend
+# =========================================
+#
+#  Usage:
+#    docker compose up -d
+#
+#  Access:
+#    http://localhost:8080
+#
+#  NOTE: network_mode: host is REQUIRED for
+#  arp-scan and nmap to discover devices on
+#  your local network. Without it, speed tests
+#  and tools work, but network scanning won't
+#  see your LAN devices.
+# =========================================
+
+services:
+  nettools:
+    build: .
+    image: mbraut/nettools:latest
+    container_name: nettools
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - nettools-data:/data
+    environment:
+      - TZ=Europe/Madrid
+    # Port 8080 is exposed via host network
+    # Change in docker/nginx/nginx.conf if needed
+
+volumes:
+  nettools-data:
+    driver: local
