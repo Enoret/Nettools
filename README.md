@@ -5,14 +5,14 @@
 <h1 align="center">NetTools</h1>
 
 <p align="center">
-  <strong>Monitor de red y test de velocidad autoalojado</strong>
+  <strong>Self-hosted network monitor and speed test</strong>
 </p>
 
 <p align="center">
-  <a href="#instalacion-docker">Docker</a> &bull;
-  <a href="#instalacion-manual">Manual</a> &bull;
-  <a href="#funcionalidades">Funcionalidades</a> &bull;
-  <a href="#capturas">Capturas</a> &bull;
+  <a href="#docker-installation">Docker</a> &bull;
+  <a href="#manual-installation">Manual</a> &bull;
+  <a href="#features">Features</a> &bull;
+  <a href="#screenshots">Screenshots</a> &bull;
   <a href="#api">API</a>
 </p>
 
@@ -25,67 +25,67 @@
 
 ---
 
-## Descripcion
+## Description
 
-**NetTools** es una aplicacion web autoalojada para monitorizar tu red local y medir la velocidad de tu conexion a Internet. Ofrece una interfaz moderna y responsive con tres modulos principales: **Net Speed** (tests de velocidad), **Net Alert** (descubrimiento de dispositivos) y **Net Check** (herramientas de diagnostico).
+**NetTools** is a self-hosted web application to monitor your local network and measure your Internet connection speed. It provides a modern, responsive interface with three main modules: **Net Speed** (speed tests), **Net Alert** (device discovery) and **Net Check** (diagnostic tools).
 
-### Caracteristicas principales
+### Key Features
 
-- Tests de velocidad automaticos y manuales con **Ookla Speedtest CLI**
-- Descubrimiento de dispositivos en tu red local con **arp-scan** y **nmap**
-- Herramientas de diagnostico: **Ping**, **Traceroute** y **NSLookup**
-- Notificaciones por **Telegram** al detectar nuevos dispositivos
-- Graficos interactivos con historial de velocidad, latencia y dispositivos
-- Temas claro, oscuro y automatico
-- Colores personalizables
-- Zona horaria configurable
-- API REST completa
-- Sin dependencias en la nube - todo se ejecuta en tu servidor
+- Automatic and manual speed tests with **Ookla Speedtest CLI**
+- Local network device discovery with **arp-scan** and **nmap**
+- Diagnostic tools: **Ping**, **Traceroute** and **NSLookup**
+- **Telegram** notifications when new devices are detected
+- Interactive charts with speed, latency and device history
+- Light, dark and auto themes
+- Customizable accent colors
+- Configurable timezone
+- Full REST API
+- No cloud dependencies - everything runs on your server
 
 ---
 
-## Funcionalidades
+## Features
 
 ### Net Speed
-- Test de velocidad manual con seleccion de servidor
-- Tests automaticos programables (15 min - 24 h)
-- Graficos de historial de velocidad (descarga/subida)
-- Graficos de latencia (ping/jitter)
-- Promedio de velocidad por hora
-- Tabla de tests recientes
-- Estadisticas: mejor descarga, mejor subida, mejor ping, total tests
+- Manual speed test with server selection
+- Scheduled automatic tests (15 min - 24 h)
+- Speed history charts (download/upload)
+- Latency charts (ping/jitter)
+- Hourly speed averages
+- Recent tests table
+- Statistics: best download, best upload, best ping, total tests
 
 ### Net Alert
-- Escaneo automatico de la red local (arp-scan + nmap)
-- Deteccion de dispositivos nuevos
-- Identificacion de marca/fabricante por MAC
-- Edicion de dispositivos: nombre, tipo, ubicacion, descripcion
-- Marcado de IP estatica o DHCP
-- Filtros: todos, en linea, desconectados, nuevos, guardados, manuales
-- Ordenacion por nombre, IP, MAC, marca, ubicacion, estado
-- Historial de dispositivos conectados (grafico)
-- Notificaciones por Telegram al detectar nuevos dispositivos
-- Ping rapido desde la tarjeta del dispositivo
+- Automatic local network scan (arp-scan + nmap)
+- New device detection
+- Manufacturer identification by MAC address
+- Device editing: name, type, location, description
+- Static IP or DHCP tagging
+- Filters: all, online, offline, new, saved, manual
+- Sort by name, IP, MAC, manufacturer, location, status
+- Connected devices history (chart)
+- Telegram notifications for new devices
+- Quick ping from device card
 
 ### Net Check
-- **Ping**: a IP individual o a todos los dispositivos guardados
-- **Traceroute**: visualizacion de la ruta con mapa de saltos y tabla detallada
-- **NSLookup / DNS**: consultas A, AAAA, MX, NS, TXT, CNAME, SOA, PTR, SRV, ANY con selector de servidor DNS
+- **Ping**: single IP or all saved devices
+- **Traceroute**: route visualization with hop map and detailed table
+- **NSLookup / DNS**: A, AAAA, MX, NS, TXT, CNAME, SOA, PTR, SRV, ANY queries with DNS server selector
 
-### Ajustes
-- Frecuencia de tests automaticos
-- Frecuencia de escaneo de red
-- Rango de red (CIDR)
-- Retencion de historial
-- Zona horaria
-- Notificaciones Telegram (bot token + chat ID + test de conexion)
-- Personalizacion de colores (acento, fondo, descarga, subida)
-- Exportacion de datos (JSON)
-- Limpieza de historial y dispositivos
+### Settings
+- Automatic test frequency
+- Network scan frequency
+- Network range (CIDR)
+- History retention
+- Timezone
+- Telegram notifications (bot token + chat ID + connection test)
+- Color customization (accent, background, download, upload)
+- Data export (JSON)
+- History and device cleanup
 
 ---
 
-## Instalacion (Docker)
+## Docker Installation
 
 ### Docker Run
 
@@ -122,36 +122,36 @@ volumes:
 docker compose up -d
 ```
 
-Accede a **http://tu-servidor:8080**
+Access **http://your-server:8080**
 
-> **Nota:** `network_mode: host` es necesario para que `arp-scan` y `nmap` puedan descubrir dispositivos en tu red local. Sin el, los tests de velocidad y herramientas de diagnostico funcionan, pero el escaneo de red no detectara dispositivos.
+> **Note:** `network_mode: host` is required for `arp-scan` and `nmap` to discover devices on your local network. Without it, speed tests and diagnostic tools will work, but network scanning won't detect devices.
 
 ---
 
-## Instalacion Manual
+## Manual Installation
 
-### Requisitos
+### Requirements
 
 - Python 3.10+
 - Nginx
-- Herramientas de red: `arp-scan`, `nmap`, `traceroute`, `dnsutils`, `iputils-ping`, `net-tools`
-- (Recomendado) Ookla Speedtest CLI
+- Network tools: `arp-scan`, `nmap`, `traceroute`, `dnsutils`, `iputils-ping`, `net-tools`
+- (Recommended) Ookla Speedtest CLI
 
-### Pasos
+### Steps
 
 ```bash
-# 1. Clonar repositorio
+# 1. Clone repository
 git clone https://github.com/Enoret/Nettools.git
 cd Nettools
 
-# 2. Instalar dependencias del sistema
+# 2. Install system dependencies
 sudo apt-get install -y arp-scan nmap iputils-ping net-tools traceroute dnsutils nginx
 
-# 3. Instalar Ookla Speedtest CLI (recomendado)
-# Ver: https://www.speedtest.net/apps/cli
-# Si no se instala, se usa speedtest-cli (Python) como fallback
+# 3. Install Ookla Speedtest CLI (recommended)
+# See: https://www.speedtest.net/apps/cli
+# If not installed, speedtest-cli (Python) will be used as fallback
 
-# 4. Configurar backend
+# 4. Setup backend
 sudo mkdir -p /opt/nettools
 sudo cp docker/backend/*.py /opt/nettools/
 sudo cp docker/backend/requirements.txt /opt/nettools/
@@ -160,16 +160,16 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# 5. Configurar frontend
+# 5. Setup frontend
 sudo cp -r Nettools/nettools/* /var/www/html/
 
-# 6. Configurar Nginx
+# 6. Configure Nginx
 sudo cp docker/nginx/nginx.conf /etc/nginx/sites-available/nettools
 sudo ln -sf /etc/nginx/sites-available/nettools /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo systemctl restart nginx
 
-# 7. Crear servicio systemd
+# 7. Create systemd service
 sudo tee /etc/systemd/system/nettools.service > /dev/null <<EOF
 [Unit]
 Description=NetTools Backend
@@ -194,11 +194,11 @@ sudo systemctl enable nettools
 sudo systemctl start nettools
 ```
 
-Accede a **http://tu-servidor:8080**
+Access **http://your-server:8080**
 
 ---
 
-## Actualizacion
+## Upgrade
 
 ### Docker
 
@@ -220,15 +220,15 @@ systemctl restart nettools
 
 ---
 
-## Arquitectura
+## Architecture
 
 ```
-                    Puerto 8080
+                    Port 8080
                         |
                     [ Nginx ]
                     /       \
-            Estaticos      /api/*
-           (Frontend)        |
+              Static       /api/*
+            (Frontend)        |
                         [ Uvicorn ]
                         (FastAPI)
                             |
@@ -236,106 +236,117 @@ systemctl restart nettools
                       /data/nettools.db
 ```
 
-| Componente | Tecnologia |
+| Component | Technology |
 |---|---|
 | Frontend | HTML5, CSS3, JavaScript (Vanilla) |
-| Graficos | ApexCharts |
-| Iconos | Remix Icon |
+| Charts | ApexCharts |
+| Icons | Remix Icon |
 | Backend | Python 3.12, FastAPI, Uvicorn |
-| Base de datos | SQLite (WAL mode) |
+| Database | SQLite (WAL mode) |
 | Speed Test | Ookla Speedtest CLI / speedtest-cli (fallback) |
-| Escaneo de red | arp-scan, nmap, python-nmap |
-| Notificaciones | Telegram Bot API |
+| Network Scan | arp-scan, nmap, python-nmap |
+| Notifications | Telegram Bot API |
+
+---
+
+## Screenshots
+
+<!-- Add your screenshots here -->
+<!-- ![Net Speed](docs/screenshots/netspeed.png) -->
+<!-- ![Net Alert](docs/screenshots/netalert.png) -->
+<!-- ![Net Check](docs/screenshots/netcheck.png) -->
+
+*Coming soon*
 
 ---
 
 ## API
 
-El backend expone una API REST en el puerto 8000, accesible via Nginx en `/api/`.
+The backend exposes a REST API on port 8000, accessible via Nginx at `/api/`.
 
 ### Speed Test
 
-| Metodo | Endpoint | Descripcion |
+| Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/api/speedtest/run` | Ejecutar un test de velocidad |
-| `GET` | `/api/speedtest/results?range=24h` | Historial de tests (1h, 6h, 24h, 7d, 30d, all) |
-| `GET` | `/api/speedtest/latest` | Ultimo test |
-| `GET` | `/api/speedtest/stats` | Estadisticas globales |
-| `GET` | `/api/speedtest/servers` | Lista de servidores disponibles |
-| `GET` | `/api/speedtest/status` | Estado del test (en curso o no) |
-| `DELETE` | `/api/speedtest/results` | Eliminar todo el historial |
-| `DELETE` | `/api/speedtest/results/{id}` | Eliminar un test |
+| `POST` | `/api/speedtest/run` | Run a speed test |
+| `GET` | `/api/speedtest/results?range=24h` | Test history (1h, 6h, 24h, 7d, 30d, all) |
+| `GET` | `/api/speedtest/latest` | Latest test |
+| `GET` | `/api/speedtest/stats` | Global statistics |
+| `GET` | `/api/speedtest/servers` | Available servers list |
+| `GET` | `/api/speedtest/status` | Test status (running or not) |
+| `DELETE` | `/api/speedtest/results` | Delete all history |
+| `DELETE` | `/api/speedtest/results/{id}` | Delete a test |
 
-### Dispositivos
+### Devices
 
-| Metodo | Endpoint | Descripcion |
+| Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/devices` | Lista de dispositivos |
-| `GET` | `/api/devices/{id}` | Detalle de un dispositivo |
-| `POST` | `/api/devices` | Crear dispositivo manual |
-| `PUT` | `/api/devices/{id}` | Actualizar dispositivo |
-| `DELETE` | `/api/devices/{id}` | Eliminar dispositivo |
-| `POST` | `/api/devices/scan` | Escanear la red |
-| `GET` | `/api/devices/scan/status` | Estado del escaneo |
-| `GET` | `/api/devices/history?range=24h` | Historial de dispositivos |
+| `GET` | `/api/devices` | Device list |
+| `GET` | `/api/devices/{id}` | Device details |
+| `POST` | `/api/devices` | Create manual device |
+| `PUT` | `/api/devices/{id}` | Update device |
+| `DELETE` | `/api/devices/{id}` | Delete device |
+| `POST` | `/api/devices/scan` | Scan network |
+| `GET` | `/api/devices/scan/status` | Scan status |
+| `GET` | `/api/devices/history?range=24h` | Device history |
 
-### Herramientas
+### Tools
 
-| Metodo | Endpoint | Descripcion |
+| Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/api/ping` | Ping a una IP |
-| `POST` | `/api/ping/batch` | Ping a multiples IPs |
-| `POST` | `/api/traceroute` | Traceroute a una IP/dominio |
-| `POST` | `/api/nslookup` | Consulta DNS |
+| `POST` | `/api/ping` | Ping an IP |
+| `POST` | `/api/ping/batch` | Ping multiple IPs |
+| `POST` | `/api/traceroute` | Traceroute to an IP/domain |
+| `POST` | `/api/nslookup` | DNS lookup |
 
-### Configuracion
+### Settings
 
-| Metodo | Endpoint | Descripcion |
+| Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/settings` | Obtener configuracion |
-| `PUT` | `/api/settings` | Guardar configuracion |
-| `POST` | `/api/settings/telegram/test` | Probar notificacion Telegram |
-| `GET` | `/api/export` | Exportar todos los datos (JSON) |
+| `GET` | `/api/settings` | Get settings |
+| `PUT` | `/api/settings` | Save settings |
+| `POST` | `/api/settings/telegram/test` | Test Telegram notification |
+| `GET` | `/api/export` | Export all data (JSON) |
 | `GET` | `/api/health` | Health check |
 
 ---
 
-## Configuracion de Telegram
+## Telegram Setup
 
-1. Crea un bot con [@BotFather](https://t.me/BotFather) en Telegram
-2. Copia el **Bot Token**
-3. Obtiene tu **Chat ID** (puedes usar [@userinfobot](https://t.me/userinfobot))
-4. En NetTools > Ajustes > Notificaciones Telegram:
-   - Activa Telegram
-   - Pega el Bot Token y Chat ID
-   - Pulsa "Enviar Prueba" para verificar
-   - Guarda la configuracion
+1. Create a bot with [@BotFather](https://t.me/BotFather) on Telegram
+2. Copy the **Bot Token**
+3. Get your **Chat ID** (you can use [@userinfobot](https://t.me/userinfobot))
+4. In NetTools > Settings > Telegram Notifications:
+   - Enable Telegram
+   - Paste the Bot Token and Chat ID
+   - Click "Send Test" to verify
+   - Save settings
 
-Recibiras una notificacion cada vez que se detecte un nuevo dispositivo en tu red.
+You will receive a notification every time a new device is detected on your network.
 
 ---
 
-## Volumen de datos
+## Data Volume
 
-| Ruta | Contenido |
+| Path | Contents |
 |---|---|
-| `/data/nettools.db` | Base de datos SQLite con tests, dispositivos y configuracion |
+| `/data/nettools.db` | SQLite database with tests, devices and settings |
 
-Para hacer backup, simplemente copia el archivo `/data/nettools.db`.
+To backup, simply copy the `/data/nettools.db` file.
 
 ---
 
-## Variables de entorno
+## Environment Variables
 
-| Variable | Defecto | Descripcion |
+| Variable | Default | Description |
 |---|---|---|
-| `NETTOOLS_DB_PATH` | `/data/nettools.db` | Ruta de la base de datos |
-| `TZ` | `Europe/Madrid` | Zona horaria del contenedor |
-| `PYTHONUNBUFFERED` | `1` | Logs en tiempo real |
+| `NETTOOLS_DB_PATH` | `/data/nettools.db` | Database path |
+| `TZ` | `Europe/Madrid` | Container timezone |
+| `PYTHONUNBUFFERED` | `1` | Real-time logs |
 
 ---
 
-## Construir la imagen
+## Build the Image
 
 ```bash
 git clone https://github.com/Enoret/Nettools.git
@@ -344,36 +355,36 @@ cd Nettools
 # Build
 docker build -t mbraut/nettools:latest .
 
-# Build multi-arquitectura (amd64 + arm64)
+# Multi-architecture build (amd64 + arm64)
 docker buildx build --platform linux/amd64,linux/arm64 -t mbraut/nettools:latest --push .
 ```
 
 ---
 
-## Requisitos del sistema
+## System Requirements
 
-| Recurso | Minimo |
+| Resource | Minimum |
 |---|---|
 | CPU | 1 core |
 | RAM | 256 MB |
-| Disco | 100 MB + base de datos |
-| Red | Acceso a la LAN para escaneo |
-| SO | Linux (Docker o bare metal) |
+| Disk | 100 MB + database |
+| Network | LAN access for scanning |
+| OS | Linux (Docker or bare metal) |
 
-Compatible con **amd64**, **arm64** (Raspberry Pi 4/5) y **armhf**.
-
----
-
-## Licencia
-
-MIT License - ver [LICENSE](LICENSE)
+Compatible with **amd64**, **arm64** (Raspberry Pi 4/5) and **armhf**.
 
 ---
 
-## Creditos
+## License
 
-Desarrollado por [bytebeat.es](https://bytebeat.es)
+MIT License - see [LICENSE](LICENSE)
+
+---
+
+## Credits
+
+Developed by [bytebeat.es](https://bytebeat.es)
 
 <p align="center">
-  <sub>NetTools - Monitor de red autoalojado</sub>
+  <sub>NetTools - Self-hosted network monitor</sub>
 </p>
