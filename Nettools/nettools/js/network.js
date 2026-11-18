@@ -157,6 +157,12 @@ const NetworkPage = {
             if (e.target === document.getElementById('deviceModal')) this.closeModal();
         });
 
+        // Wake-on-LAN from the device sheet
+        document.getElementById('modalWol').addEventListener('click', () => {
+            const id = parseInt(document.getElementById('deviceId').value);
+            if (id) this.wakeDevice(id, document.getElementById('modalWol'));
+        });
+
         // Merge modal
         document.getElementById('modalMerge').addEventListener('click', () => {
             const id = parseInt(document.getElementById('deviceId').value);
@@ -477,6 +483,10 @@ const NetworkPage = {
             });
         });
 
+        grid.querySelectorAll('.device-wol-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.wakeDevice(parseInt(btn.dataset.id), btn));
+        });
+
         grid.querySelectorAll('.device-ping-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const ip = btn.dataset.ip;
@@ -584,7 +594,11 @@ const NetworkPage = {
                 ${Utils.logoTile(device.brand, icon, `device-logo ${device.status === 'new' ? 'state-new' : device.is_online ? 'state-online' : 'state-offline'}`)}
                 ${cols.map(c => this.renderCell(device, c, visibleIds)).join('')}
                 <div class="device-actions col-actions">
-                    ${device.ip_address ? `
+                    ${!device.is_online && device.mac_address ? `
+                        <button class="device-action-btn device-wol-btn" data-id="${device.id}" title="Encender (Wake-on-LAN)">
+                            <i class="ri-shut-down-line"></i>
+                        </button>
+                    ` : device.ip_address ? `
                         <button class="device-action-btn device-ping-btn" data-ip="${device.ip_address}" title="Ping">
                             <i class="ri-wifi-line"></i>
                         </button>
@@ -689,6 +703,7 @@ const NetworkPage = {
         }
 
         document.getElementById('modalMerge').style.display = device ? '' : 'none';
+        document.getElementById('modalWol').style.display = device && device.mac_address ? '' : 'none';
         modal.classList.add('visible');
         document.getElementById('deviceName').focus();
     },
@@ -1148,6 +1163,30 @@ const NetworkPage = {
                 this.clearSelection();
             }
         });
+    },
+
+    async wakeDevice(id, btn) {
+        const device = this.devices.find(d => d.id === id);
+        const name = device ? (device.custom_name || device.hostname || device.ip_address || device.mac_address) : '';
+        const orig = btn ? btn.innerHTML : null;
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ri-loader-4-line" style="animation:spin 1s linear infinite"></i>';
+        }
+        try {
+            await API.devices.wake(id);
+            Toast.success(I18N.t('Paquete Wake-on-LAN enviado a {name}. Si el equipo lo admite, se encendera en unos segundos.', { name }));
+            if (device && device.mac_private) {
+                Toast.warning(I18N.t('Este equipo usa una MAC privada/aleatoria: Wake-on-LAN solo funciona con la MAC real de la tarjeta.'));
+            }
+        } catch (err) {
+            Toast.error(I18N.t('No se pudo encender: {e}', { e: err.message }));
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = orig;
+            }
+        }
     },
 
     async deleteDevice(id) {

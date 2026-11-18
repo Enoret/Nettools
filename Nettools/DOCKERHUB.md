@@ -34,6 +34,9 @@
 - **Telegram** notifications: new devices, scheduled speed test results, opened/closed ports
 - Automatic cleanup of stale unsaved devices and configurable data retention
 - Interactive charts with speed, latency and device history
+- **Internet outage monitor**: router and Internet checked every minute, availability %, outage timeline and history; bell + Telegram alerts
+- **Optional sign-in**: local user, **LDAP** (LLDAP, OpenLDAP, Active Directory) and/or **SSO with OpenID Connect** (Authelia, Authentik, Keycloak...), with required group
+- **Wake-on-LAN** for offline devices with a known MAC
 - **English and Spanish** interface (automatic from the browser language, or fixed in Settings); Telegram messages and hints follow the language
 - **Notifications bell**: the same events sent to Telegram (new devices, scheduled speed tests, port changes), with read / mark-all-read, even without Telegram
 - Light, dark and auto themes, customizable accent colors, configurable timezone
@@ -161,6 +164,7 @@ docker compose up -d
 | `NETTOOLS_PORT` | `8080` | Web UI port |
 | `NETTOOLS_BACKEND_PORT` | `8000` | API backend port (internal) |
 | `NETTOOLS_DB_PATH` | `/data/nettools.db` | Database path |
+| `NETTOOLS_AUTH_DISABLED` | `false` | Emergency switch: `true` disables the sign-in (if you get locked out) |
 | `TZ` | `Europe/Madrid` | Container timezone |
 | `PYTHONUNBUFFERED` | `1` | Real-time logs |
 

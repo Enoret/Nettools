@@ -159,6 +159,45 @@ def init_db():
         );
 
         CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at);
+
+        CREATE TABLE IF NOT EXISTS sessions (
+            token_hash TEXT PRIMARY KEY,
+            username TEXT,
+            method TEXT,
+            created_at DATETIME,
+            expires_at DATETIME,
+            last_seen DATETIME,
+            display_name TEXT,
+            avatar TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS oidc_states (
+            state TEXT PRIMARY KEY,
+            verifier TEXT,
+            nonce TEXT,
+            next TEXT,
+            redirect_uri TEXT,
+            created_at REAL
+        );
+
+        CREATE TABLE IF NOT EXISTS connectivity_checks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME,
+            gateway_ok INTEGER,          -- NULL if no gateway was found
+            internet_ok INTEGER,
+            latency REAL
+        );
+        CREATE INDEX IF NOT EXISTS idx_connectivity_ts ON connectivity_checks(timestamp);
+
+        CREATE TABLE IF NOT EXISTS outages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kind TEXT,                   -- internet | gateway
+            start DATETIME,
+            end DATETIME,
+            last_seen DATETIME,
+            duration INTEGER             -- seconds, when closed
+        );
+        CREATE INDEX IF NOT EXISTS idx_outages_start ON outages(start);
         CREATE INDEX IF NOT EXISTS idx_device_ports_device ON device_ports(device_id);
         CREATE INDEX IF NOT EXISTS idx_speed_tests_timestamp ON speed_tests(timestamp);
         CREATE INDEX IF NOT EXISTS idx_devices_ip ON devices(ip_address);
@@ -189,6 +228,12 @@ def init_db():
             cursor.execute(f"SELECT {col} FROM inventory LIMIT 1")
         except sqlite3.OperationalError:
             cursor.execute(f"ALTER TABLE inventory ADD COLUMN {col} {ddl}")
+
+    for col in ('display_name', 'avatar'):
+        try:
+            cursor.execute(f"SELECT {col} FROM sessions LIMIT 1")
+        except sqlite3.OperationalError:
+            cursor.execute(f"ALTER TABLE sessions ADD COLUMN {col} TEXT")
 
     try:
         cursor.execute("SELECT description_auto FROM devices LIMIT 1")
@@ -246,6 +291,34 @@ def init_db():
         'notify_new_ports': 'true',
         'language': 'auto',        # auto (browser) | es | en
         'ui_language': '',         # language reported by the UI when 'auto'
+        'connectivity_enabled': 'true',
+        'connectivity_interval': '60',
+        'connectivity_targets': '1.1.1.1,8.8.8.8',
+        'connectivity_threshold': '2',
+        'notify_outages': 'true',
+        'auth_enabled': 'false',
+        'auth_session_days': '7',
+        'auth_local_enabled': 'true',
+        'auth_local_username': 'admin',
+        'auth_local_password_hash': '',
+        'auth_ldap_enabled': 'false',
+        'auth_ldap_url': '',
+        'auth_ldap_bind_dn': '',
+        'auth_ldap_bind_password': '',
+        'auth_ldap_base_dn': '',
+        'auth_ldap_user_filter': '(&(objectClass=person)(uid={username}))',
+        'auth_ldap_user_dn_template': '',
+        'auth_ldap_group': '',
+        'auth_ldap_verify_ssl': 'false',
+        'auth_oidc_enabled': 'false',
+        'auth_oidc_name': 'SSO',
+        'auth_oidc_issuer': '',
+        'auth_oidc_client_id': '',
+        'auth_oidc_client_secret': '',
+        'auth_oidc_scopes': 'openid profile email groups',
+        'auth_oidc_group': '',
+        'auth_oidc_redirect_uri': '',
+        'auth_oidc_verify_ssl': 'true',
         'unifi_enabled': 'false',
         'unifi_url': '',
         'unifi_auth': 'api_key',
@@ -974,6 +1047,83 @@ def get_settings() -> dict:
     return settings
 
 
+# Settings that are never sent back to the browser (only "<key>_set": bool)
+SECRET_SETTINGS = ('telegram_bot_token', 'unifi_api_key', 'unifi_password',
+                   'auth_local_password_hash', 'auth_ldap_bind_password', 'auth_oidc_client_secret')
+
+
+def get_public_settings() -> dict:
+    s = get_settings()
+    for k in SECRET_SETTINGS:
+        s[f'{k}_set'] = bool(s.get(k))
+        s[k] = ''
+    return s
+
+
+# --- Sessions (login) ---
+def _hash_token(token: str) -> str:
+    import hashlib
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def create_session(token: str, username: str, method: str, days: int,
+                   display_name: str = None, avatar: str = None) -> None:
+    now = now_local()
+    expires = (_ts(now) + timedelta(days=max(1, days))).strftime('%Y-%m-%d %H:%M:%S')
+    conn = get_db()
+    conn.execute("DELETE FROM sessions WHERE expires_at < ?", (now,))
+    conn.execute("INSERT INTO sessions (token_hash, username, method, created_at, expires_at, last_seen, display_name, avatar) "
+                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                 (_hash_token(token), username, method, now, expires, now, display_name, avatar))
+    conn.commit()
+    conn.close()
+
+
+def get_session(token: str):
+    if not token:
+        return None
+    conn = get_db()
+    row = conn.execute("SELECT * FROM sessions WHERE token_hash = ? AND expires_at > ?",
+                       (_hash_token(token), now_local())).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def delete_session(token: str):
+    conn = get_db()
+    conn.execute("DELETE FROM sessions WHERE token_hash = ?", (_hash_token(token or ''),))
+    conn.commit()
+    conn.close()
+
+
+def delete_all_sessions():
+    conn = get_db()
+    conn.execute("DELETE FROM sessions")
+    conn.commit()
+    conn.close()
+
+
+def save_oidc_state(state, verifier, nonce, next_url, redirect_uri):
+    import time as _time
+    conn = get_db()
+    conn.execute("DELETE FROM oidc_states WHERE created_at < ?", (_time.time() - 600,))
+    conn.execute("INSERT INTO oidc_states VALUES (?, ?, ?, ?, ?, ?)",
+                 (state, verifier, nonce, next_url, redirect_uri, _time.time()))
+    conn.commit()
+    conn.close()
+
+
+def pop_oidc_state(state):
+    import time as _time
+    conn = get_db()
+    row = conn.execute("SELECT * FROM oidc_states WHERE state = ? AND created_at > ?",
+                       (state or '', _time.time() - 600)).fetchone()
+    conn.execute("DELETE FROM oidc_states WHERE state = ?", (state or '',))
+    conn.commit()
+    conn.close()
+    return dict(row) if row else None
+
+
 def update_settings(data: dict):
     conn = get_db()
     ts = now_local()
@@ -998,7 +1148,7 @@ def purge_old_data(retention_days: int) -> dict:
     conn = get_db()
     cutoff_params = (now_local(), f'-{int(retention_days)} days')
     deleted = {}
-    for table in ('speed_tests', 'ping_results', 'device_snapshots'):
+    for table in ('speed_tests', 'ping_results', 'device_snapshots', 'connectivity_checks'):
         cur = conn.execute(
             f"DELETE FROM {table} WHERE timestamp < datetime(?, ?)", cutoff_params
         )
@@ -1028,6 +1178,117 @@ def purge_stale_devices(days: int) -> list:
         conn.commit()
     conn.close()
     return rows
+
+
+# --- Connectivity / outages ---
+def _ts(s: str) -> datetime:
+    return datetime.strptime(s, '%Y-%m-%d %H:%M:%S')
+
+
+def save_connectivity_check(gateway_ok, internet_ok, latency):
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO connectivity_checks (timestamp, gateway_ok, internet_ok, latency) VALUES (?, ?, ?, ?)",
+        (now_local(), None if gateway_ok is None else int(bool(gateway_ok)), int(bool(internet_ok)), latency))
+    conn.commit()
+    conn.close()
+
+
+def get_open_outage():
+    conn = get_db()
+    row = conn.execute("SELECT * FROM outages WHERE end IS NULL ORDER BY id DESC LIMIT 1").fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def open_outage(kind: str, failed_checks: int = 1, interval: int = 60) -> dict:
+    """Start an outage, back-dated to the first failed check."""
+    now = now_local()
+    start = (_ts(now) - timedelta(seconds=max(0, failed_checks - 1) * interval)).strftime('%Y-%m-%d %H:%M:%S')
+    conn = get_db()
+    cur = conn.execute("INSERT INTO outages (kind, start, last_seen) VALUES (?, ?, ?)", (kind, start, now))
+    conn.commit()
+    row = dict(conn.execute("SELECT * FROM outages WHERE id = ?", (cur.lastrowid,)).fetchone())
+    conn.close()
+    return row
+
+
+def touch_outage(outage_id: int):
+    conn = get_db()
+    conn.execute("UPDATE outages SET last_seen = ? WHERE id = ?", (now_local(), outage_id))
+    conn.commit()
+    conn.close()
+
+
+def close_outage(outage_id: int, end: str = None) -> dict:
+    conn = get_db()
+    row = dict(conn.execute("SELECT * FROM outages WHERE id = ?", (outage_id,)).fetchone())
+    end = end or now_local()
+    duration = max(0, int((_ts(end) - _ts(row['start'])).total_seconds()))
+    conn.execute("UPDATE outages SET end = ?, duration = ? WHERE id = ?", (end, duration, outage_id))
+    conn.commit()
+    row = dict(conn.execute("SELECT * FROM outages WHERE id = ?", (outage_id,)).fetchone())
+    conn.close()
+    return row
+
+
+def close_stale_outages() -> int:
+    """At startup: an outage left open when NetTools stopped ends at the last
+    failed check that was seen (we don't know what happened afterwards)."""
+    n = 0
+    for o in [dict(r) for r in _rows("SELECT * FROM outages WHERE end IS NULL")]:
+        close_outage(o['id'], o['last_seen'] or o['start'])
+        n += 1
+    return n
+
+
+def _rows(query, params=()):
+    conn = get_db()
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+    return rows
+
+
+def get_connectivity(range_filter: str = '24h') -> dict:
+    """Availability summary, timeline buckets and outages for a range."""
+    ranges = {'24h': (24 * 3600, 600), '7d': (7 * 86400, 3600), '30d': (30 * 86400, 6 * 3600)}
+    span, bucket = ranges.get(range_filter, ranges['24h'])
+    now = _ts(now_local())
+    since = (now - timedelta(seconds=span)).strftime('%Y-%m-%d %H:%M:%S')
+    conn = get_db()
+    buckets = [dict(r) for r in conn.execute(f"""
+        SELECT (CAST(strftime('%s', timestamp) AS INTEGER) / {bucket}) * {bucket} AS b,
+               COUNT(*) AS total,
+               SUM(internet_ok) AS internet_ok,
+               SUM(CASE WHEN gateway_ok = 0 THEN 1 ELSE 0 END) AS gateway_down,
+               AVG(latency) AS latency
+        FROM connectivity_checks WHERE timestamp >= ?
+        GROUP BY b ORDER BY b
+    """, (since,))]
+    totals = conn.execute(
+        "SELECT COUNT(*), SUM(internet_ok) FROM connectivity_checks WHERE timestamp >= ?", (since,)).fetchone()
+    last = conn.execute("SELECT * FROM connectivity_checks ORDER BY id DESC LIMIT 1").fetchone()
+    outages = [dict(r) for r in conn.execute(
+        "SELECT * FROM outages WHERE COALESCE(end, last_seen, start) >= ? ORDER BY start DESC LIMIT 100", (since,))]
+    conn.close()
+    for b in buckets:
+        b['time'] = datetime.utcfromtimestamp(b.pop('b')).strftime('%Y-%m-%d %H:%M:%S')
+    total, ok = totals[0] or 0, totals[1] or 0
+    open_ev = next((o for o in outages if o['end'] is None), None)
+    return {
+        'range': range_filter,
+        'bucket_seconds': bucket,
+        'since': since,
+        'now': now.strftime('%Y-%m-%d %H:%M:%S'),
+        'checks': total,
+        'uptime': round(ok / total * 100, 2) if total else None,
+        'buckets': buckets,
+        'outages': outages,
+        'outage_count': len(outages),
+        'downtime': sum((o['duration'] or 0) for o in outages if o['end']),
+        'last_check': dict(last) if last else None,
+        'current_outage': open_ev,
+    }
 
 
 # --- Notifications (bell panel) ---
@@ -1255,5 +1516,5 @@ def get_all_data() -> dict:
         'devices': get_devices(),
         'device_ports': _all_device_ports(),
         'inventory': get_inventory(),
-        'settings': get_settings(),
+        'settings': get_public_settings(),
     }

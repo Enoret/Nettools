@@ -41,6 +41,9 @@
 - **Telegram** notifications: new devices, scheduled speed test results, opened/closed ports
 - Automatic cleanup of stale unsaved devices and configurable data retention
 - Interactive charts with speed, latency and device history
+- **Internet outage monitor**: router and Internet checked every minute, availability %, outage timeline and history; bell + Telegram alerts
+- **Optional sign-in**: local user, **LDAP** (LLDAP, OpenLDAP, Active Directory) and/or **SSO with OpenID Connect** (Authelia, Authentik, Keycloak...), with required group
+- **Wake-on-LAN** for offline devices with a known MAC
 - **English and Spanish** interface (automatic from the browser language, or fixed in Settings); Telegram messages and hints follow the language
 - **Notifications bell**: the same events sent to Telegram (new devices, scheduled speed tests, port changes), with read / mark-all-read, even without Telegram
 - Light, dark and auto themes, customizable accent colors, configurable timezone
@@ -54,6 +57,7 @@
 ### Net Speed
 - Manual speed test with server selection
 - Gauges up to 1 Gbps
+- Internet availability: router + Internet checked every minute, uptime %, outage timeline (24h / 7d / 30d) and outage list
 - Telegram message with the result of scheduled tests (always, or only below a threshold)
 - Scheduled automatic tests (15 min - 24 h)
 - Speed history charts (download/upload)
@@ -75,6 +79,7 @@
 - Stat cards (total / online / offline / new) work as filters, plus filters for saved and manual devices
 - Automatic cleanup of unsaved devices without IP not seen for N days
 - Connected devices history (chart), quick ping from the device list
+- Wake-on-LAN button for offline devices with a known MAC
 
 ### Inventory
 - Saved and manual devices are added automatically; the sheet survives if the device is deleted from Net Alert
@@ -83,6 +88,11 @@
 - Items that are not on the network can be added by hand
 - Manufacturer logos (automatic or uploaded), warranty expiry badges, total value
 - Configurable columns, CSV export (Excel) and print / PDF view
+
+### Security
+- Sign-in is off by default. Settings → Access: local user (hashed password), LDAP (service account + user filter, or DN template; optional required group) and OpenID Connect SSO (authorization code + PKCE; optional required group from the `groups` claim). Methods can be combined.
+- Server-side sessions in an HttpOnly cookie, brute-force protection, secrets (tokens, passwords) are never sent back to the browser or included in the export.
+- Locked out? Start the container with `NETTOOLS_AUTH_DISABLED=true`.
 
 ### Interface
 - Full-width top bar with notifications bell and light / system / dark theme selector
@@ -378,6 +388,7 @@ To backup, simply copy the `/data/nettools.db` file.
 | `NETTOOLS_PORT` | `8080` | Web UI port |
 | `NETTOOLS_BACKEND_PORT` | `8000` | API backend port (internal) |
 | `NETTOOLS_DB_PATH` | `/data/nettools.db` | Database path |
+| `NETTOOLS_AUTH_DISABLED` | `false` | Emergency switch: `true` disables the sign-in (if you get locked out) |
 | `TZ` | `Europe/Madrid` | Container timezone |
 | `PYTHONUNBUFFERED` | `1` | Real-time logs |
 

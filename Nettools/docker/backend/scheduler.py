@@ -20,13 +20,16 @@ from network_service import scan_network, resolve_ranges, infer_device_type
 from oui_service import resolve_vendor
 import unifi_service
 import hint_service
+import connectivity_service
 from port_scan_service import scan_ports
 
 try:
     from telegram_service import (send_new_device_alert, send_speed_test_result,
-                                  send_speed_test_failure, send_port_changes_alert)
+                                  send_speed_test_failure, send_port_changes_alert,
+                                  send_outage_resolved)
 except ImportError:
-    send_new_device_alert = send_speed_test_result = send_speed_test_failure = send_port_changes_alert = None
+    send_new_device_alert = send_speed_test_result = send_speed_test_failure = None
+    send_port_changes_alert = send_outage_resolved = None
 
 logger = logging.getLogger(__name__)
 
@@ -372,6 +375,30 @@ def scheduled_port_scan():
         logger.error(f"Bulk port scan failed: {e}")
 
 
+def _notify_outage(kind: str, event: dict, phase: str):
+    settings = db.get_settings()
+    if not settings.get('notify_outages', True):
+        return
+    if phase == 'start':
+        _panel('outage_start', {'kind': kind, 'start': event.get('start')}, 'error')
+        return  # Telegram is unreachable during an Internet outage
+    _panel('outage_end', {'kind': kind, 'start': event.get('start'), 'end': event.get('end'),
+                          'duration': event.get('duration')}, 'warning')
+    target = _telegram_target(settings)
+    if target and send_outage_resolved is not None:
+        try:
+            send_outage_resolved(*target, event, db.server_language(settings))
+        except Exception as e:
+            logger.error(f"Outage Telegram notification failed: {e}")
+
+
+def scheduled_connectivity_check():
+    try:
+        connectivity_service.run_check(db, _notify_outage)
+    except Exception as e:
+        logger.error(f"Connectivity check failed: {e}")
+
+
 def scheduled_cleanup():
     try:
         settings = db.get_settings()
@@ -399,7 +426,7 @@ def scheduled_cleanup():
 def _configure_jobs():
     settings = db.get_settings()
 
-    for job_id in ('speed_test', 'network_scan', 'port_scan'):
+    for job_id in ('speed_test', 'network_scan', 'port_scan', 'connectivity'):
         try:
             scheduler.remove_job(job_id)
         except Exception:
@@ -426,6 +453,21 @@ def _configure_jobs():
             max_instances=1,
         )
         logger.info(f"Network scan scheduled every {freq} minutes")
+
+    if settings.get('connectivity_enabled', True):
+        try:
+            interval = min(600, max(15, int(settings.get('connectivity_interval', 60) or 60)))
+        except ValueError:
+            interval = 60
+        scheduler.add_job(
+            scheduled_connectivity_check,
+            trigger=IntervalTrigger(seconds=interval),
+            id='connectivity',
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+        logger.info(f"Internet monitor every {interval} s")
 
     if settings.get('auto_port_scan', False):
         hour = int(settings.get('port_scan_hour', 3) or 0) % 24

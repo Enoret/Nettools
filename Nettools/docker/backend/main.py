@@ -4,11 +4,13 @@ Main application entry point
 """
 
 import json
+import base64
+import hashlib
+import secrets
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from typing import Optional, List
 from pydantic import BaseModel
 import asyncio
@@ -60,6 +62,7 @@ async def lifespan(app: FastAPI):
         filled = db.backfill_vendors(lambda mac: resolve_vendor(mac))
         released = db.fix_ip_conflicts()
         hints = db.refresh_hints(hint_service.guess)
+        db.close_stale_outages()
         if filled or released or hints:
             logger.info(f"Startup maintenance: {filled} vendors updated, {released} stale IPs released, "
                         f"{hints} device hints updated")
@@ -74,18 +77,208 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="NetTools API",
     description="API para monitoreo de red y tests de velocidad",
-    version="1.2.0",
+    version="1.3.0",
     lifespan=lifespan,
 )
 
 # CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# No CORS middleware: the UI is always served from the same origin (nginx),
+# and allowing any origin with credentials would expose the session cookie.
+
+import auth_service
+
+PUBLIC_API = ('/api/health', '/api/auth/status', '/api/auth/login', '/api/auth/logout',
+              '/api/auth/oidc/start', '/api/auth/oidc/callback')
+
+
+@app.middleware("http")
+async def require_login(request: Request, call_next):
+    """When the login is enabled every /api call needs a valid session."""
+    path = request.url.path
+    if path.startswith('/api/') and path not in PUBLIC_API:
+        settings = db.get_settings()
+        if auth_service.is_enabled(settings):
+            session = db.get_session(request.cookies.get(auth_service.COOKIE))
+            if not session:
+                return JSONResponse({'detail': 'No autenticado', 'auth_required': True}, status_code=401)
+            request.state.user = session
+    return await call_next(request)
+
+
+def _client_ip(request: Request) -> str:
+    return (request.headers.get('x-real-ip') or (request.client.host if request.client else '') or '?')
+
+
+def _is_https(request: Request) -> bool:
+    return request.headers.get('x-forwarded-proto', request.url.scheme) == 'https'
+
+
+def _redirect_uri(request: Request, settings: dict) -> str:
+    configured = (settings.get('auth_oidc_redirect_uri') or '').strip()
+    if configured:
+        return configured
+    proto = request.headers.get('x-forwarded-proto', request.url.scheme)
+    host = request.headers.get('x-forwarded-host') or request.headers.get('host') or request.url.netloc
+    return f"{proto}://{host}/api/auth/oidc/callback"
+
+
+def _safe_next(next_url: str) -> str:
+    # only local paths / hashes (no open redirect)
+    if not next_url or not next_url.startswith(('/', '#')) or next_url.startswith('//'):
+        return '/'
+    return next_url if next_url.startswith('/') else '/' + next_url
+
+
+def _login_response(request: Request, user: dict, settings: dict, redirect: str = None):
+    token = secrets.token_urlsafe(32)
+    try:
+        days = int(settings.get('auth_session_days', 7) or 7)
+    except ValueError:
+        days = 7
+    db.create_session(token, user['username'], user['method'], days,
+                      user.get('name'), user.get('avatar'))
+    resp = RedirectResponse(redirect, status_code=303) if redirect else JSONResponse(
+        {'ok': True, 'user': user['username'], 'method': user['method']})
+    resp.set_cookie(auth_service.COOKIE, token, max_age=days * 86400, httponly=True,
+                    samesite='lax', secure=_is_https(request), path='/')
+    logger.info(f"Login: {user['username']} ({user['method']}) from {_client_ip(request)}")
+    return resp
+
+
+# ==========================================
+#  AUTH (login)
+# ==========================================
+
+class LoginRequest(BaseModel):
+    username: str = ''
+    password: str = ''
+
+
+@app.get("/api/auth/status")
+async def auth_status(request: Request):
+    settings = db.get_settings()
+    enabled = auth_service.is_enabled(settings)
+    session = db.get_session(request.cookies.get(auth_service.COOKIE)) if enabled else None
+    return {
+        'enabled': enabled,
+        'authenticated': (not enabled) or bool(session),
+        'user': session['username'] if session else None,
+        'name': (session.get('display_name') or session['username']) if session else None,
+        # the picture is served by /api/auth/avatar (cacheable), not inline
+        'avatar': (session['avatar'] if session['avatar'].startswith('https://')
+                   else f"/api/auth/avatar?v={hashlib.sha1(session['avatar'].encode()).hexdigest()[:10]}")
+                  if session and session.get('avatar') else None,
+        'method': session['method'] if session else None,
+        'methods': auth_service.methods(settings),
+        'disabled_by_env': auth_service.auth_disabled_by_env(),
+    }
+
+
+@app.get("/api/auth/avatar")
+async def auth_avatar(request: Request):
+    """Profile picture of the signed-in user (from LDAP jpegPhoto)."""
+    session = db.get_session(request.cookies.get(auth_service.COOKIE))
+    avatar = (session or {}).get('avatar') or ''
+    if not avatar.startswith('data:image/'):
+        raise HTTPException(status_code=404, detail="Sin avatar")
+    header, b64 = avatar.split(',', 1)
+    mime = header[5:].split(';')[0]
+    from fastapi.responses import Response
+    return Response(base64.b64decode(b64), media_type=mime,
+                    headers={'Cache-Control': 'private, max-age=86400'})
+
+
+@app.post("/api/auth/login")
+async def auth_login(data: LoginRequest, request: Request):
+    settings = db.get_settings()
+    ip = _client_ip(request)
+    if auth_service.too_many_failures(ip):
+        raise HTTPException(status_code=429, detail="Demasiados intentos fallidos. Espera unos minutos.")
+    user = auth_service.check_local(settings, data.username, data.password)
+    if not user and auth_service.methods(settings)['ldap']:
+        loop = asyncio.get_event_loop()
+        user = await loop.run_in_executor(executor, auth_service.check_ldap, settings, data.username, data.password)
+    if not user:
+        auth_service.record_failure(ip)
+        logger.warning(f"Failed login for '{data.username}' from {ip}")
+        raise HTTPException(status_code=401, detail="Usuario o contrasena incorrectos")
+    auth_service.clear_failures(ip)
+    return _login_response(request, user, settings)
+
+
+@app.post("/api/auth/logout")
+async def auth_logout(request: Request):
+    db.delete_session(request.cookies.get(auth_service.COOKIE))
+    resp = JSONResponse({'ok': True})
+    resp.delete_cookie(auth_service.COOKIE, path='/')
+    return resp
+
+
+@app.get("/api/auth/oidc/start")
+async def auth_oidc_start(request: Request, next: str = '/'):
+    settings = db.get_settings()
+    if not auth_service.methods(settings)['oidc']:
+        return RedirectResponse('/login.html?error=oidc_disabled', status_code=303)
+    redirect_uri = _redirect_uri(request, settings)
+    try:
+        loop = asyncio.get_event_loop()
+        url, state, verifier, nonce = await loop.run_in_executor(
+            executor, auth_service.oidc_start, settings, redirect_uri)
+    except auth_service.AuthError as e:
+        logger.error(f"OIDC start failed: {e}")
+        return RedirectResponse('/login.html?error=oidc_unavailable', status_code=303)
+    db.save_oidc_state(state, verifier, nonce, _safe_next(next), redirect_uri)
+    return RedirectResponse(url, status_code=303)
+
+
+@app.get("/api/auth/oidc/callback")
+async def auth_oidc_callback(request: Request, code: str = '', state: str = '', error: str = ''):
+    settings = db.get_settings()
+    if error:
+        logger.warning(f"OIDC provider returned error: {error}")
+        return RedirectResponse('/login.html?error=oidc_denied', status_code=303)
+    saved = db.pop_oidc_state(state)
+    if not saved or not code:
+        return RedirectResponse('/login.html?error=oidc_state', status_code=303)
+    try:
+        loop = asyncio.get_event_loop()
+        user = await loop.run_in_executor(executor, auth_service.oidc_finish, settings, code,
+                                          saved['redirect_uri'], saved['verifier'], saved['nonce'])
+    except auth_service.AuthError as e:
+        logger.warning(f"OIDC login rejected: {e}")
+        kind = 'oidc_group' if 'grupo' in str(e) else 'oidc_failed'
+        return RedirectResponse(f'/login.html?error={kind}', status_code=303)
+    return _login_response(request, user, settings, redirect=saved['next'] or '/')
+
+
+class LdapTestRequest(BaseModel):
+    username: str
+    password: str
+
+
+@app.post("/api/auth/test/ldap")
+async def auth_test_ldap(data: LdapTestRequest):
+    """Try an LDAP login with the saved settings (does not create a session)."""
+    settings = db.get_settings()
+    loop = asyncio.get_event_loop()
+    try:
+        user = await loop.run_in_executor(executor, lambda: auth_service.check_ldap(
+            {**settings, 'auth_ldap_enabled': True}, data.username, data.password, True))
+    except auth_service.AuthError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {'ok': True, 'username': user['username'], 'groups': user.get('groups', [])}
+
+
+@app.post("/api/auth/test/oidc")
+async def auth_test_oidc(request: Request):
+    settings = db.get_settings()
+    loop = asyncio.get_event_loop()
+    try:
+        d = await loop.run_in_executor(executor, auth_service.discovery, settings)
+    except auth_service.AuthError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {'ok': True, 'issuer': d.get('issuer'), 'redirect_uri': _redirect_uri(request, settings),
+            'scopes_supported': d.get('scopes_supported')}
 
 
 # --- Health ---
@@ -227,6 +420,24 @@ async def get_device_ports(device_id: int):
 
 
 # ==========================================
+#  INTERNET MONITOR
+# ==========================================
+
+@app.get("/api/connectivity")
+async def connectivity(range: str = Query('24h', pattern='^(24h|7d|30d)$')):
+    """Availability summary, timeline and outages."""
+    return db.get_connectivity(range)
+
+
+@app.post("/api/connectivity/check")
+async def connectivity_check_now():
+    """Run a check now (without storing it) - used by the settings test button."""
+    import connectivity_service
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(executor, connectivity_service.check, db.get_settings())
+
+
+# ==========================================
 #  NOTIFICATIONS (bell panel)
 # ==========================================
 
@@ -316,6 +527,26 @@ async def update_device(device_id: int, data: DeviceUpdate):
 
 class MergeRequest(BaseModel):
     source_id: int
+
+
+@app.post("/api/devices/{device_id}/wol")
+async def wake_device(device_id: int):
+    """Send a Wake-on-LAN magic packet to a device."""
+    import wol_service
+    device = db.get_device(device_id)
+    if not device:
+        raise HTTPException(status_code=404, detail="Dispositivo no encontrado")
+    if not device.get('mac_address'):
+        raise HTTPException(status_code=400, detail="El dispositivo no tiene MAC: no se puede encender por red")
+    loop = asyncio.get_event_loop()
+    try:
+        result = await loop.run_in_executor(
+            executor, wol_service.wake, device['mac_address'], device.get('ip_address') or device.get('last_ip'))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return result
 
 
 @app.post("/api/devices/{device_id}/merge")
@@ -541,14 +772,36 @@ async def nslookup_reverse(data: ReverseLookupRequest):
 
 @app.get("/api/settings")
 async def get_settings():
-    """Get all settings."""
-    return db.get_settings()
+    """Get all settings (secrets are never returned, only '<key>_set')."""
+    return db.get_public_settings()
 
 
 @app.put("/api/settings")
 async def update_settings(data: SettingsUpdate):
     """Update settings."""
     settings_data = data.model_dump(exclude_none=True)
+    # Secrets: an empty value means "keep the stored one"
+    for key in db.SECRET_SETTINGS:
+        if key in settings_data and not settings_data[key]:
+            del settings_data[key]
+    settings_data.pop('auth_local_password_hash', None)
+    new_password = settings_data.pop('auth_local_password', None)
+    if new_password:
+        if len(new_password) < 8:
+            raise HTTPException(status_code=400, detail="La contrasena debe tener al menos 8 caracteres")
+        settings_data['auth_local_password_hash'] = auth_service.hash_password(new_password)
+    if 'auth_session_days' in settings_data:
+        try:
+            assert 1 <= int(settings_data['auth_session_days']) <= 90
+        except (ValueError, AssertionError):
+            raise HTTPException(status_code=400, detail="Duracion de sesion no valida")
+    merged = {**db.get_settings(), **settings_data}
+    if merged.get('auth_enabled'):
+        m = auth_service.methods(merged)
+        if not (m['local'] or m['ldap'] or m['oidc']):
+            raise HTTPException(status_code=400, detail="Para activar el inicio de sesion configura al menos un metodo: "
+                                                        "usuario local con contrasena, LDAP o SSO")
+    password_changed = 'auth_local_password_hash' in settings_data
     if 'network_ranges' in settings_data:
         try:
             settings_data['network_ranges'] = ','.join(parse_range_list(settings_data['network_ranges']))
@@ -566,6 +819,17 @@ async def update_settings(data: SettingsUpdate):
                 assert isinstance(cfg, dict) and isinstance(cfg.get('columns'), list) and len(settings_data[key]) < 4000
             except Exception:
                 raise HTTPException(status_code=400, detail="Configuracion de columnas no valida")
+    if 'connectivity_targets' in settings_data:
+        import re as _re
+        targets = [t.strip() for t in settings_data['connectivity_targets'].replace(';', ',').split(',') if t.strip()]
+        if not targets or len(targets) > 5 or any(not _re.fullmatch(r'[A-Za-z0-9.\-:]+', t) for t in targets):
+            raise HTTPException(status_code=400, detail="Destinos no validos (hasta 5 IPs o dominios separados por comas)")
+        settings_data['connectivity_targets'] = ','.join(targets)
+    if 'connectivity_interval' in settings_data:
+        try:
+            assert 15 <= int(settings_data['connectivity_interval']) <= 600
+        except (ValueError, AssertionError):
+            raise HTTPException(status_code=400, detail="Intervalo no valido")
     if settings_data.get('language') not in (None, 'auto', 'es', 'en'):
         raise HTTPException(status_code=400, detail="Idioma no valido")
     if settings_data.get('ui_language') not in (None, 'es', 'en'):
@@ -582,10 +846,13 @@ async def update_settings(data: SettingsUpdate):
         # device hints are stored as text: regenerate them in the new language
         db.refresh_hints(hint_service.guess)
 
+    if password_changed:
+        db.delete_all_sessions()  # log everybody out after a password change
+
     # Update scheduler with new settings
     update_schedule()
 
-    return db.get_settings()
+    return db.get_public_settings()
 
 
 @app.post("/api/settings/telegram/test")
@@ -617,7 +884,8 @@ async def test_unifi(data: SettingsUpdate = None):
     (possibly unsaved) values sent in the body."""
     settings = db.get_settings()
     if data is not None:
-        settings.update({k: v for k, v in data.model_dump(exclude_none=True).items() if k.startswith('unifi_')})
+        settings.update({k: v for k, v in data.model_dump(exclude_none=True).items()
+                         if k.startswith('unifi_') and (v or k not in db.SECRET_SETTINGS)})
     loop = asyncio.get_event_loop()
     try:
         return await loop.run_in_executor(executor, unifi_service.test_connection, settings)

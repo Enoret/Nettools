@@ -223,7 +223,8 @@ const Notifications = {
             // Open the related section (and mark it as read)
             const n = this.items.find(x => x.id === id);
             if (n && !n.read) this.markRead(id);
-            const page = { new_devices: 'network', port_changes: 'network', speed_test: 'speed', speed_test_failed: 'speed' }[n && n.type];
+            const page = { new_devices: 'network', port_changes: 'network', speed_test: 'speed', speed_test_failed: 'speed',
+                           outage_start: 'speed', outage_end: 'speed' }[n && n.type];
             if (page) {
                 this.close();
                 Router.navigate(page);
@@ -322,6 +323,21 @@ const Notifications = {
                     text: lines.join('<br>') + ((d.changes || []).length > 4 ? '<br>' + I18N.t('y {n} mas', { n: d.changes.length - 4 }) : ''),
                 };
             }
+            case 'outage_start':
+                return {
+                    icon: d.kind === 'gateway' ? 'ri-router-line' : 'ri-wifi-off-line',
+                    title: I18N.t(d.kind === 'gateway' ? 'El router no responde' : 'Sin conexion a Internet'),
+                    text: I18N.t('Desde las {t}', { t: (d.start || '').slice(11, 16) }),
+                };
+            case 'outage_end':
+                return {
+                    icon: 'ri-global-line',
+                    title: I18N.t(d.kind === 'gateway' ? 'El router vuelve a responder' : 'Internet ha vuelto'),
+                    text: I18N.t('Corte de {d} ({from} - {to})', {
+                        d: UptimeCard.fmtDuration(d.duration),
+                        from: (d.start || '').slice(11, 16), to: (d.end || '').slice(11, 16),
+                    }),
+                };
             default:
                 return { icon: 'ri-notification-3-line', title: n.type, text: '' };
         }
@@ -350,6 +366,71 @@ const Notifications = {
                     ${n.read ? '<span></span>' : `<button class="notif-read-btn" title="${I18N.t('Marcar como leida')}"><i class="ri-check-line"></i></button>`}
                 </div>`;
         }).join('');
+    },
+};
+
+// --- Signed-in user (top bar) ---
+const Auth = {
+    async init() {
+        const menu = document.getElementById('userMenu');
+        const dropdown = document.getElementById('userDropdown');
+        const btn = document.getElementById('avatarBtn');
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const open = dropdown.classList.toggle('hidden') === false;
+            btn.classList.toggle('open', open);
+        });
+        document.addEventListener('click', (e) => {
+            if (!dropdown.classList.contains('hidden') && !e.target.closest('.user-menu')) {
+                dropdown.classList.add('hidden');
+                btn.classList.remove('open');
+            }
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { dropdown.classList.add('hidden'); btn.classList.remove('open'); }
+        });
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            try { await fetch('/api/auth/logout', { method: 'POST' }); } catch (e) { /* ignore */ }
+            window.location.href = '/login.html';
+        });
+        try {
+            const st = await (await fetch('/api/auth/status')).json();
+            if (st.enabled && !st.authenticated) {
+                window.location.href = '/login.html?next=' + encodeURIComponent('/' + (window.location.hash || ''));
+                return;
+            }
+            if (st.enabled && st.user) {
+                this.render(st);
+                menu.classList.remove('hidden');
+            }
+        } catch (e) { /* backend down: ConnectionStatus shows it */ }
+    },
+
+    initials(name) {
+        const parts = String(name || '?').replace(/[._@-]+/g, ' ').trim().split(/\s+/);
+        return ((parts[0] || '?')[0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+    },
+
+    render(st) {
+        const name = st.name || st.user;
+        const method = { local: 'Usuario local', ldap: 'LDAP', oidc: (st.methods && st.methods.oidc_name) || 'SSO' }[st.method] || st.method;
+        ['avatarSmall', 'avatarLarge'].forEach(id => {
+            const el = document.getElementById(id);
+            el.textContent = '';
+            if (st.avatar) {
+                const img = document.createElement('img');
+                img.src = st.avatar;
+                img.alt = '';
+                img.onerror = () => { img.remove(); el.textContent = this.initials(name); };
+                el.appendChild(img);
+            } else {
+                el.textContent = this.initials(name);
+            }
+        });
+        document.getElementById('userDdName').textContent = name;
+        document.getElementById('userDdSub').textContent = name !== st.user
+            ? `${st.user} · ${I18N.t(method)}` : I18N.t(method);
+        document.getElementById('avatarBtn').title = name;
     },
 };
 
@@ -586,6 +667,7 @@ document.addEventListener('DOMContentLoaded', () => {
     Router.init();
     ConnectionStatus.startPolling();
     Notifications.init();
+    Auth.init();
     // Language chosen in the settings (server) and the UI language for the
     // texts generated by the server (Telegram, device hints)
     API.settings.getAll().then(s => I18N.syncWithServer(s)).catch(() => {});

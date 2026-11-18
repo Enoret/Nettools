@@ -64,7 +64,7 @@ COPY nettools/ /usr/share/nginx/html/
 # Make static files readable by nginx regardless of host file permissions
 RUN chmod -R a+rX /usr/share/nginx/html
 # Cache busting: index.html references JS/CSS with ?v=<build timestamp>
-RUN sed -i "s/__BUILD__/$(date +%s)/g" /usr/share/nginx/html/index.html
+RUN sed -i "s/__BUILD__/$(date +%s)/g" /usr/share/nginx/html/index.html /usr/share/nginx/html/login.html
 
 # Nginx configuration (template - port replaced at runtime by entrypoint)
 COPY docker/nginx/nginx.conf /etc/nginx/conf.d/default.conf.template

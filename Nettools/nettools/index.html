@@ -48,6 +48,23 @@
                     <i class="ri-moon-clear-line"></i>
                 </button>
             </div>
+            <div class="user-menu hidden" id="userMenu">
+                <button class="avatar-btn" id="avatarBtn" aria-label="Cuenta" title="Cuenta">
+                    <span class="avatar" id="avatarSmall"></span>
+                </button>
+                <div class="user-dropdown hidden" id="userDropdown">
+                    <div class="user-dd-head">
+                        <span class="avatar avatar-lg" id="avatarLarge"></span>
+                        <div class="user-dd-info">
+                            <div class="user-dd-name" id="userDdName" translate="no"></div>
+                            <div class="user-dd-sub" id="userDdSub"></div>
+                        </div>
+                    </div>
+                    <button class="user-dd-item" id="logoutBtn">
+                        <i class="ri-logout-box-r-line"></i> Cerrar sesion
+                    </button>
+                </div>
+            </div>
         </div>
     </header>
 
@@ -96,7 +113,7 @@
         </div>
 
         <div class="sidebar-footer">
-            <div class="sidebar-version">v1.2.0</div>
+            <div class="sidebar-version">v1.3.0</div>
             <div class="sidebar-credit"><a href="https://braut.es" target="_blank">braut.es</a></div>
         </div>
     </aside>
@@ -233,6 +250,33 @@
             </div>
 
             <!-- Charts -->
+            <!-- Internet availability (outage monitor) -->
+            <div class="section-card uptime-card" id="uptimeCard">
+                <div class="section-header">
+                    <h3><i class="ri-pulse-line"></i> Disponibilidad de Internet</h3>
+                    <div class="chart-range-selector" id="uptimeRange">
+                        <button class="btn btn-sm btn-secondary active" data-range="24h">24h</button>
+                        <button class="btn btn-sm btn-secondary" data-range="7d">7d</button>
+                        <button class="btn btn-sm btn-secondary" data-range="30d">30d</button>
+                    </div>
+                </div>
+                <div class="uptime-summary">
+                    <div class="uptime-status" id="uptimeStatus"><span class="status-dot"></span><span>Cargando...</span></div>
+                    <div class="uptime-stat"><span class="uptime-label">Disponibilidad</span><b id="uptimePct">--</b></div>
+                    <div class="uptime-stat"><span class="uptime-label">Cortes</span><b id="uptimeOutages">--</b></div>
+                    <div class="uptime-stat"><span class="uptime-label">Tiempo sin conexion</span><b id="uptimeDowntime">--</b></div>
+                </div>
+                <div class="uptime-bar" id="uptimeBar"></div>
+                <div class="uptime-axis"><span id="uptimeFrom"></span><span>Ahora</span></div>
+                <div class="uptime-legend">
+                    <span><i class="lg ok"></i> Con conexion</span>
+                    <span><i class="lg down"></i> Sin Internet</span>
+                    <span><i class="lg router"></i> Router sin respuesta</span>
+                    <span><i class="lg nodata"></i> Sin datos</span>
+                </div>
+                <div class="uptime-events" id="uptimeEvents"></div>
+            </div>
+
             <div class="charts-grid">
                 <div class="chart-card wide">
                     <div class="chart-header">
@@ -946,6 +990,65 @@
                     </div>
                 </div>
 
+                <!-- Internet monitor -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <h3><i class="ri-pulse-line"></i> Monitor de Internet</h3>
+                    </div>
+                    <div class="setting-group">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Vigilar la Conexion</label>
+                                <p>Comprueba cada poco el router y varios servidores de Internet para detectar cortes y medir la disponibilidad</p>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="connectivityEnabled" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Frecuencia</label>
+                                <p>Cada cuanto se comprueba la conexion</p>
+                            </div>
+                            <select class="select" id="connectivityInterval">
+                                <option value="30">Cada 30 segundos</option>
+                                <option value="60" selected>Cada minuto</option>
+                                <option value="120">Cada 2 minutos</option>
+                                <option value="300">Cada 5 minutos</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Confirmar el Corte Tras</label>
+                                <p>Comprobaciones fallidas seguidas para considerarlo un corte (evita falsas alarmas)</p>
+                            </div>
+                            <select class="select" id="connectivityThreshold">
+                                <option value="1">1 comprobacion</option>
+                                <option value="2" selected>2 comprobaciones</option>
+                                <option value="3">3 comprobaciones</option>
+                                <option value="5">5 comprobaciones</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Servidores de Internet</label>
+                                <p>Hasta 5 IPs o dominios separados por comas. Hay conexion si responde cualquiera de ellos.</p>
+                            </div>
+                            <input type="text" class="input mono" id="connectivityTargets" placeholder="1.1.1.1,8.8.8.8" autocomplete="off">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Comprobar Ahora</label>
+                                <p id="connectivityTestResult">Hace una comprobacion con los valores guardados</p>
+                            </div>
+                            <button class="btn btn-secondary" id="connectivityTestBtn">
+                                <i class="ri-pulse-line"></i> Comprobar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- UniFi integration -->
                 <div class="section-card">
                     <div class="section-header">
@@ -1071,6 +1174,16 @@
                         </div>
                         <div class="setting-item">
                             <div class="setting-info">
+                                <label>Cortes de Internet</label>
+                                <p>Avisar cuando se cae Internet o el router (por Telegram, al volver la conexion)</p>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="notifyOutages" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
                                 <label>Cambios en Puertos</label>
                                 <p>Avisar si el escaneo diario de puertos detecta puertos nuevos abiertos o cerrados</p>
                             </div>
@@ -1114,6 +1227,233 @@
                             <button class="btn btn-secondary" id="testTelegramBtn">
                                 <i class="ri-send-plane-line"></i> Enviar Prueba
                             </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Access / login -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <h3><i class="ri-shield-user-line"></i> Acceso</h3>
+                    </div>
+                    <div class="setting-group">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Requerir Inicio de Sesion</label>
+                                <p>Pide usuario y contrasena (o SSO) para usar NetTools. Configura antes al menos un metodo.</p>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="authEnabled">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Duracion de la Sesion</label>
+                                <p>Tiempo que se mantiene la sesion iniciada</p>
+                            </div>
+                            <select class="select" id="authSessionDays">
+                                <option value="1">1 dia</option>
+                                <option value="7" selected>7 dias</option>
+                                <option value="30">30 dias</option>
+                                <option value="90">90 dias</option>
+                            </select>
+                        </div>
+                        <p class="auth-note"><i class="ri-information-line"></i> Si te quedas sin acceso, arranca el contenedor con la variable <code>NETTOOLS_AUTH_DISABLED=true</code> para desactivar el inicio de sesion.</p>
+
+                        <div class="auth-block">
+                            <div class="auth-block-title"><i class="ri-user-line"></i> Usuario local</div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Usuario Local</label>
+                                <p>Un usuario y contrasena guardados en NetTools</p>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="authLocalEnabled" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Usuario</label>
+                                <p>Nombre de usuario</p>
+                            </div>
+                            <input type="text" class="input" id="authLocalUsername" placeholder="admin" autocomplete="off">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Contrasena</label>
+                                <p><span id="authLocalPasswordHint">Minimo 8 caracteres</span></p>
+                            </div>
+                            <input type="password" class="input" id="authLocalPassword" placeholder="Nueva contrasena" autocomplete="new-password">
+                        </div>
+                        </div>
+
+                        <div class="auth-block">
+                            <div class="auth-block-title"><i class="ri-organization-chart"></i> LDAP</div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Activar LDAP</label>
+                                <p>Usuarios de tu directorio: LLDAP, OpenLDAP, Active Directory...</p>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="authLdapEnabled">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Servidor</label>
+                                <p>ldap://servidor:389 o ldaps://servidor:636 (LLDAP: puerto 3890)</p>
+                            </div>
+                            <input type="text" class="input mono" id="authLdapUrl" placeholder="ldap://192.168.1.10:3890" autocomplete="off">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Base DN</label>
+                                <p>Donde buscar los usuarios</p>
+                            </div>
+                            <input type="text" class="input mono" id="authLdapBaseDn" placeholder="dc=example,dc=com" autocomplete="off">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Usuario de Servicio (Bind DN)</label>
+                                <p>Cuenta de solo lectura para buscar usuarios. Dejalo vacio para usar la plantilla de DN.</p>
+                            </div>
+                            <input type="text" class="input mono" id="authLdapBindDn" placeholder="uid=nettools,ou=people,dc=example,dc=com" autocomplete="off">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Contrasena del Servicio</label>
+                                <p><span id="authLdapBindPasswordHint">Contrasena del usuario de servicio</span></p>
+                            </div>
+                            <input type="password" class="input" id="authLdapBindPassword" placeholder="Contrasena" autocomplete="new-password">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Filtro de Usuario</label>
+                                <p>Usa {username}. Active Directory: (sAMAccountName={username})</p>
+                            </div>
+                            <input type="text" class="input mono" id="authLdapUserFilter" placeholder="(&(objectClass=person)(uid={username}))" autocomplete="off">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Plantilla de DN (sin servicio)</label>
+                                <p>Opcional: entrar directamente con el DN del usuario. Usa {username}.</p>
+                            </div>
+                            <input type="text" class="input mono" id="authLdapUserDnTemplate" placeholder="uid={username},ou=people,dc=example,dc=com" autocomplete="off">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Grupo Requerido</label>
+                                <p>Opcional: solo pueden entrar los miembros de este grupo (nombre o DN)</p>
+                            </div>
+                            <input type="text" class="input mono" id="authLdapGroup" placeholder="nettools-admins" autocomplete="off">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Verificar Certificado</label>
+                                <p>Para ldaps:// con certificado valido</p>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="authLdapVerifySsl">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Probar LDAP</label>
+                                <p><span id="authLdapTestResult">Guarda la configuracion y prueba con un usuario real</span></p>
+                            </div>
+                            <div class="auth-test-row">
+                                <input type="text" class="input" id="authLdapTestUser" placeholder="Usuario" autocomplete="off">
+                                <input type="password" class="input" id="authLdapTestPass" placeholder="Contrasena" autocomplete="new-password">
+                                <button class="btn btn-secondary" id="authLdapTestBtn"><i class="ri-plug-line"></i> Probar</button>
+                            </div>
+                        </div>
+                        </div>
+
+                        <div class="auth-block">
+                            <div class="auth-block-title"><i class="ri-shield-keyhole-line"></i> SSO (OpenID Connect)</div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Activar SSO</label>
+                                <p>Authelia, Authentik, Keycloak, Zitadel... Aparece un boton "Entrar con..." en la pagina de inicio de sesion</p>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="authOidcEnabled">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Nombre del Boton</label>
+                                <p>Texto del boton de inicio de sesion</p>
+                            </div>
+                            <input type="text" class="input" id="authOidcName" placeholder="SSO" autocomplete="off">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Proveedor (Issuer)</label>
+                                <p>URL base del proveedor OpenID Connect</p>
+                            </div>
+                            <input type="text" class="input mono" id="authOidcIssuer" placeholder="https://auth.example.com" autocomplete="off">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Client ID</label>
+                                <p>Identificador del cliente registrado en el proveedor</p>
+                            </div>
+                            <input type="text" class="input mono" id="authOidcClientId" placeholder="nettools" autocomplete="off">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Client Secret</label>
+                                <p><span id="authOidcClientSecretHint">Secreto del cliente</span></p>
+                            </div>
+                            <input type="password" class="input" id="authOidcClientSecret" placeholder="Secreto" autocomplete="new-password">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Scopes</label>
+                                <p>Permisos que se piden al proveedor</p>
+                            </div>
+                            <input type="text" class="input mono" id="authOidcScopes" placeholder="openid profile email groups" autocomplete="off">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Grupo Requerido</label>
+                                <p>Opcional: solo pueden entrar los miembros de este grupo (claim groups)</p>
+                            </div>
+                            <input type="text" class="input mono" id="authOidcGroup" placeholder="nettools-admins" autocomplete="off">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Redirect URI</label>
+                                <p>Registrala tal cual en el proveedor. Vacia = se calcula sola con la direccion de NetTools.</p>
+                            </div>
+                            <div class="input-copy">
+                                <input type="text" class="input mono" id="authOidcRedirectUri" autocomplete="off">
+                                <button class="btn btn-secondary btn-icon" id="authOidcCopyBtn" title="Copiar"><i class="ri-file-copy-line"></i></button>
+                            </div>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Verificar Certificado</label>
+                                <p>Desactivalo solo si el proveedor usa un certificado autofirmado</p>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="authOidcVerifySsl" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Probar SSO</label>
+                                <p><span id="authOidcTestResult">Comprueba que el proveedor responde</span></p>
+                            </div>
+                            <button class="btn btn-secondary" id="authOidcTestBtn"><i class="ri-plug-line"></i> Probar</button>
+                        </div>
                         </div>
                     </div>
                 </div>
@@ -1232,7 +1572,7 @@
                         <div class="about-logo">
                             <img src="assets/logo.png" class="about-logo-img" alt="NetTools">
                             <h2>NetTools</h2>
-                            <p class="version">Version 1.2.0</p>
+                            <p class="version">Version 1.3.0</p>
                             <p class="about-developer">Desarrollado por <a href="https://braut.es" target="_blank">braut.es</a></p>
                         </div>
                         <div class="about-details">
@@ -1333,7 +1673,10 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary modal-footer-left" id="modalMerge" title="Es el mismo equipo que otro registro (p. ej. un movil que ha cambiado de MAC)">
+                <button class="btn btn-secondary modal-footer-left" id="modalWol" title="Encender el equipo por red (Wake-on-LAN)">
+                    <i class="ri-shut-down-line"></i> Encender
+                </button>
+                <button class="btn btn-secondary" id="modalMerge" title="Es el mismo equipo que otro registro (p. ej. un movil que ha cambiado de MAC)">
                     <i class="ri-git-merge-line"></i> Fusionar...
                 </button>
                 <button class="btn btn-secondary" id="modalCancel">Cancelar</button>
@@ -1643,6 +1986,7 @@
     <script src="js/api.js?v=__BUILD__"></script>
     <script src="js/app.js?v=__BUILD__"></script>
     <script src="js/speedtest.js?v=__BUILD__"></script>
+    <script src="js/uptime.js?v=__BUILD__"></script>
     <script src="js/netcheck.js?v=__BUILD__"></script>
     <script src="js/columns.js?v=__BUILD__"></script>
     <script src="js/network.js?v=__BUILD__"></script>

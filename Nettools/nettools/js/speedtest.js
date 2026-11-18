@@ -28,6 +28,7 @@ const SpeedTestPage = {
         this.loadData();
         this.loadAutoTestStatus();
         this.startAutoRefresh();
+        UptimeCard.init();
     },
 
     destroy() {
@@ -50,6 +51,7 @@ const SpeedTestPage = {
     async _autoRefreshTick() {
         // Only refresh if this page is currently visible and not mid-test
         if (typeof Router !== 'undefined' && Router.currentPage !== 'speed') return;
+        UptimeCard.load();
         if (this.isTesting) return;
 
         try {

@@ -17,6 +17,12 @@ const API = {
             const response = await fetch(url, config);
             if (!response.ok) {
                 const error = await response.json().catch(() => ({ detail: 'Error desconocido' }));
+                if (response.status === 401 && error.auth_required) {
+                    // Session missing or expired: go to the login page and come back here
+                    const next = '/' + (window.location.hash || '');
+                    window.location.href = '/login.html?next=' + encodeURIComponent(next);
+                    throw new Error('No autenticado');
+                }
                 throw new Error(error.detail || `HTTP ${response.status}`);
             }
             return await response.json();
@@ -70,6 +76,10 @@ const API = {
 
     // --- Devices ---
     devices: {
+        async wake(id) {
+            return API.request(`/devices/${id}/wol`, { method: 'POST' });
+        },
+
         async getAll(params = {}) {
             const query = new URLSearchParams(params).toString();
             return API.request(`/devices${query ? '?' + query : ''}`);
@@ -188,6 +198,16 @@ const API = {
                 body: JSON.stringify({ ip }),
             });
         }
+    },
+
+    // --- Internet monitor ---
+    connectivity: {
+        async get(range = '24h') {
+            return API.request(`/connectivity?range=${range}`);
+        },
+        async checkNow() {
+            return API.request('/connectivity/check', { method: 'POST' });
+        },
     },
 
     // --- Notifications (bell) ---

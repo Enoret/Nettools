@@ -64,6 +64,20 @@ const SettingsPage = {
         // Telegram test
         document.getElementById('testTelegramBtn').addEventListener('click', () => this.testTelegram());
 
+        // Access / login
+        document.getElementById('authLdapTestBtn').addEventListener('click', () => this.testLdap());
+        document.getElementById('authOidcTestBtn').addEventListener('click', () => this.testOidc());
+        document.getElementById('authOidcCopyBtn').addEventListener('click', () => {
+            const el = document.getElementById('authOidcRedirectUri');
+            const text = el.value || el.placeholder;
+            (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
+                .then(() => Toast.success(I18N.t('Copiado')))
+                .catch(() => { el.value = text; el.select(); });
+        });
+
+        // Internet monitor test
+        document.getElementById('connectivityTestBtn').addEventListener('click', () => this.testConnectivity());
+
         // Bulk port scan
         document.getElementById('bulkPortScanBtn').addEventListener('click', () => this.startBulkPortScan());
         this.pollBulkPortScan();
@@ -282,6 +296,12 @@ const SettingsPage = {
         if (settings.telegram_chat_id !== undefined) {
             document.getElementById('telegramChatId').value = settings.telegram_chat_id || '';
         }
+        // Internet monitor
+        document.getElementById('connectivityEnabled').checked = settings.connectivity_enabled !== false;
+        document.getElementById('connectivityInterval').value = settings.connectivity_interval || '60';
+        document.getElementById('connectivityThreshold').value = settings.connectivity_threshold || '2';
+        document.getElementById('connectivityTargets').value = settings.connectivity_targets || '1.1.1.1,8.8.8.8';
+        document.getElementById('notifyOutages').checked = settings.notify_outages !== false;
         // Port scan
         document.getElementById('autoPortScan').checked = !!settings.auto_port_scan;
         document.getElementById('portScanHour').value = settings.port_scan_hour || '3';
@@ -304,6 +324,48 @@ const SettingsPage = {
         }
         // Language
         document.getElementById('languageSelect').value = settings.language || 'auto';
+
+        // Access / login
+        const val = (id, v) => { document.getElementById(id).value = v == null ? '' : v; };
+        const chk = (id, v) => { document.getElementById(id).checked = !!v; };
+        chk('authEnabled', settings.auth_enabled);
+        val('authSessionDays', settings.auth_session_days || '7');
+        chk('authLocalEnabled', settings.auth_local_enabled !== false);
+        val('authLocalUsername', settings.auth_local_username || 'admin');
+        val('authLocalPassword', '');
+        chk('authLdapEnabled', settings.auth_ldap_enabled);
+        val('authLdapUrl', settings.auth_ldap_url);
+        val('authLdapBaseDn', settings.auth_ldap_base_dn);
+        val('authLdapBindDn', settings.auth_ldap_bind_dn);
+        val('authLdapBindPassword', '');
+        val('authLdapUserFilter', settings.auth_ldap_user_filter);
+        val('authLdapUserDnTemplate', settings.auth_ldap_user_dn_template);
+        val('authLdapGroup', settings.auth_ldap_group);
+        chk('authLdapVerifySsl', settings.auth_ldap_verify_ssl);
+        chk('authOidcEnabled', settings.auth_oidc_enabled);
+        val('authOidcName', settings.auth_oidc_name || 'SSO');
+        val('authOidcIssuer', settings.auth_oidc_issuer);
+        val('authOidcClientId', settings.auth_oidc_client_id);
+        val('authOidcClientSecret', '');
+        val('authOidcScopes', settings.auth_oidc_scopes || 'openid profile email groups');
+        val('authOidcGroup', settings.auth_oidc_group);
+        val('authOidcRedirectUri', settings.auth_oidc_redirect_uri);
+        document.getElementById('authOidcRedirectUri').placeholder = `${window.location.origin}/api/auth/oidc/callback`;
+        chk('authOidcVerifySsl', settings.auth_oidc_verify_ssl !== false);
+        this._authWasEnabled = !!settings.auth_enabled;
+
+        // Secrets are never sent back: show whether they are stored
+        const secretHint = (inputId, isSet, emptyPh) => {
+            const el = document.getElementById(inputId);
+            el.value = '';
+            el.placeholder = isSet ? I18N.t('•••••••• (guardado, escribe para cambiarlo)') : I18N.t(emptyPh);
+        };
+        secretHint('telegramBotToken', settings.telegram_bot_token_set, '123456789:ABCdefGHI...');
+        secretHint('unifiApiKey', settings.unifi_api_key_set, 'API key');
+        secretHint('unifiPassword', settings.unifi_password_set, '');
+        secretHint('authLocalPassword', settings.auth_local_password_hash_set, 'Nueva contrasena');
+        secretHint('authLdapBindPassword', settings.auth_ldap_bind_password_set, 'Contrasena');
+        secretHint('authOidcClientSecret', settings.auth_oidc_client_secret_set, 'Secreto');
     },
 
     async saveSettings() {
@@ -325,6 +387,12 @@ const SettingsPage = {
             telegram_chat_id: document.getElementById('telegramChatId').value.trim(),
             timezone: document.getElementById('timezoneSelect').value,
             language: document.getElementById('languageSelect').value,
+            ...this.getAuthSettings(),
+            connectivity_enabled: document.getElementById('connectivityEnabled').checked,
+            connectivity_interval: document.getElementById('connectivityInterval').value,
+            connectivity_threshold: document.getElementById('connectivityThreshold').value,
+            connectivity_targets: document.getElementById('connectivityTargets').value.trim() || '1.1.1.1,8.8.8.8',
+            notify_outages: document.getElementById('notifyOutages').checked,
             auto_port_scan: document.getElementById('autoPortScan').checked,
             port_scan_hour: document.getElementById('portScanHour').value,
             port_scan_profile: document.getElementById('portScanProfile').value,
@@ -336,6 +404,14 @@ const SettingsPage = {
         try {
             const saved = await API.settings.update(settings);
             Toast.success('Configuracion guardada');
+            document.getElementById('authLocalPassword').value = '';
+            if (saved && saved.auth_enabled && !this._authWasEnabled) {
+                // Login just enabled: this browser has no session yet
+                Toast.info(I18N.t('Inicio de sesion activado. Entra con tu usuario.'));
+                setTimeout(() => { window.location.href = '/login.html?next=' + encodeURIComponent('/#settings'); }, 1500);
+                return true;
+            }
+            this._authWasEnabled = !!(saved && saved.auth_enabled);
             // Reloads the page if the language changed
             if (saved) setTimeout(() => I18N.syncWithServer(saved), 600);
             return true;
@@ -483,6 +559,29 @@ const SettingsPage = {
         }
     },
 
+    async testConnectivity() {
+        const btn = document.getElementById('connectivityTestBtn');
+        const out = document.getElementById('connectivityTestResult');
+        btn.disabled = true;
+        out.classList.remove('text-success', 'text-danger');
+        out.textContent = I18N.t('Comprobando...');
+        try {
+            const r = await API.connectivity.checkNow();
+            const targets = Object.entries(r.targets || {}).map(([t, ok]) => `${t} ${ok ? '✓' : '✗'}`).join(', ');
+            const gw = r.gateway
+                ? I18N.t('Router {ip}: {state}', { ip: r.gateway, state: I18N.t(r.gateway_ok ? 'responde' : 'no responde') })
+                : I18N.t('Router: no detectado');
+            out.textContent = `${gw} · Internet: ${I18N.t(r.internet_ok ? 'OK' : 'sin conexion')} (${targets})` +
+                (r.latency != null ? ` · ${r.latency} ms` : '');
+            out.classList.add(r.internet_ok ? 'text-success' : 'text-danger');
+        } catch (err) {
+            out.textContent = `Error: ${err.message}`;
+            out.classList.add('text-danger');
+        } finally {
+            btn.disabled = false;
+        }
+    },
+
     async startBulkPortScan() {
         try {
             await API.settings.scanAllPorts();
@@ -520,6 +619,75 @@ const SettingsPage = {
                 Toast.success('Escaneo de puertos completado');
                 if (typeof NetworkPage !== 'undefined' && NetworkPage.loadDevices) NetworkPage.loadDevices();
             }
+        }
+    },
+
+    getAuthSettings() {
+        const v = (id) => document.getElementById(id).value.trim();
+        const c = (id) => document.getElementById(id).checked;
+        const out = {
+            auth_enabled: c('authEnabled'),
+            auth_session_days: v('authSessionDays'),
+            auth_local_enabled: c('authLocalEnabled'),
+            auth_local_username: v('authLocalUsername') || 'admin',
+            auth_ldap_enabled: c('authLdapEnabled'),
+            auth_ldap_url: v('authLdapUrl'),
+            auth_ldap_base_dn: v('authLdapBaseDn'),
+            auth_ldap_bind_dn: v('authLdapBindDn'),
+            auth_ldap_bind_password: document.getElementById('authLdapBindPassword').value,
+            auth_ldap_user_filter: v('authLdapUserFilter') || '(&(objectClass=person)(uid={username}))',
+            auth_ldap_user_dn_template: v('authLdapUserDnTemplate'),
+            auth_ldap_group: v('authLdapGroup'),
+            auth_ldap_verify_ssl: c('authLdapVerifySsl'),
+            auth_oidc_enabled: c('authOidcEnabled'),
+            auth_oidc_name: v('authOidcName') || 'SSO',
+            auth_oidc_issuer: v('authOidcIssuer'),
+            auth_oidc_client_id: v('authOidcClientId'),
+            auth_oidc_client_secret: document.getElementById('authOidcClientSecret').value,
+            auth_oidc_scopes: v('authOidcScopes') || 'openid profile email groups',
+            auth_oidc_group: v('authOidcGroup'),
+            auth_oidc_redirect_uri: v('authOidcRedirectUri'),
+            auth_oidc_verify_ssl: c('authOidcVerifySsl'),
+        };
+        const pw = document.getElementById('authLocalPassword').value;
+        if (pw) out.auth_local_password = pw;
+        return out;
+    },
+
+    async testLdap() {
+        const out = document.getElementById('authLdapTestResult');
+        out.classList.remove('text-success', 'text-danger');
+        if (!(await this.saveSettings())) return;
+        out.textContent = I18N.t('Comprobando...');
+        try {
+            const r = await API.request('/auth/test/ldap', {
+                method: 'POST',
+                body: JSON.stringify({
+                    username: document.getElementById('authLdapTestUser').value.trim(),
+                    password: document.getElementById('authLdapTestPass').value,
+                }),
+            });
+            out.textContent = I18N.t('OK: {user} puede entrar', { user: r.username }) +
+                (r.groups && r.groups.length ? ` (${r.groups.join(', ')})` : '');
+            out.classList.add('text-success');
+        } catch (err) {
+            out.textContent = `Error: ${err.message}`;
+            out.classList.add('text-danger');
+        }
+    },
+
+    async testOidc() {
+        const out = document.getElementById('authOidcTestResult');
+        out.classList.remove('text-success', 'text-danger');
+        if (!(await this.saveSettings())) return;
+        out.textContent = I18N.t('Comprobando...');
+        try {
+            const r = await API.request('/auth/test/oidc', { method: 'POST' });
+            out.textContent = I18N.t('OK: {issuer} responde. Redirect URI: {uri}', { issuer: r.issuer, uri: r.redirect_uri });
+            out.classList.add('text-success');
+        } catch (err) {
+            out.textContent = `Error: ${err.message}`;
+            out.classList.add('text-danger');
         }
     },
 

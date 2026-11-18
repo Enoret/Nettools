@@ -93,6 +93,12 @@ TEXTS = {
         'sent': 'Mensaje de prueba enviado correctamente',
         'tg_error': 'Error de Telegram: {error}',
         'unknown_error': 'Error desconocido',
+        'outage_internet': 'NetTools - Internet ha vuelto',
+        'outage_gateway': 'NetTools - El router vuelve a responder',
+        'outage_body_internet': 'Ha habido un corte de Internet',
+        'outage_body_gateway': 'El router (o la red local) no respondia',
+        'from_to': 'Desde {start} hasta {end}',
+        'duration': 'Duracion',
     },
     'en': {
         'new_one': 'New device detected',
@@ -123,6 +129,12 @@ TEXTS = {
         'sent': 'Test message sent',
         'tg_error': 'Telegram error: {error}',
         'unknown_error': 'Unknown error',
+        'outage_internet': 'NetTools - Internet is back',
+        'outage_gateway': 'NetTools - The router is responding again',
+        'outage_body_internet': 'There was an Internet outage',
+        'outage_body_gateway': 'The router (or the local network) was not responding',
+        'from_to': 'From {start} to {end}',
+        'duration': 'Duration',
     },
 }
 
@@ -254,6 +266,29 @@ def send_speed_test_failure(bot_token: str, chat_id: str, error: str, lang: str 
     message = (
         f"❌ <b>{_t(lang, 'failed_title')}</b>\n\n"
         f"{_t(lang, 'failed_body')}\n<code>{html.escape(str(error))[:500]}</code>"
+    )
+    return send_telegram_message(bot_token, chat_id, message).get('success', False)
+
+
+def fmt_duration(seconds: int) -> str:
+    seconds = int(seconds or 0)
+    h, rem = divmod(seconds, 3600)
+    m, s = divmod(rem, 60)
+    if h:
+        return f"{h} h {m} min"
+    if m:
+        return f"{m} min {s} s" if m < 10 and s else f"{m} min"
+    return f"{s} s"
+
+
+def send_outage_resolved(bot_token: str, chat_id: str, event: dict, lang: str = 'es') -> bool:
+    """Sent when the connection is back (during the outage Telegram is unreachable)."""
+    kind = event.get('kind', 'internet')
+    message = (
+        f"{'🌐' if kind == 'internet' else '🔌'} <b>{_t(lang, 'outage_' + kind)}</b>\n\n"
+        f"{_t(lang, 'outage_body_' + kind)}.\n"
+        f"{_t(lang, 'from_to', start=html.escape(event.get('start') or ''), end=html.escape(event.get('end') or ''))}\n"
+        f"{_t(lang, 'duration')}: <b>{fmt_duration(event.get('duration'))}</b>"
     )
     return send_telegram_message(bot_token, chat_id, message).get('success', False)
 

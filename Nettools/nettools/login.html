@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetTools - Iniciar sesion</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+    <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.1.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css?v=__BUILD__">
+    <script>
+        // Theme before painting (same storage as the app)
+        (function () {
+            var t = 'system';
+            try { t = localStorage.getItem('nettools-theme') || 'system'; } catch (e) {}
+            if (t === 'system') t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
+</head>
+<body class="login-body">
+    <main class="login-wrap">
+        <div class="login-card">
+            <div class="login-brand">
+                <img src="assets/logo.png" alt="" class="login-logo">
+                <span class="logo-text">NetTools</span>
+            </div>
+            <h1 class="login-title">Iniciar sesion</h1>
+
+            <div class="login-error hidden" id="loginError"><i class="ri-error-warning-line"></i> <span></span></div>
+
+            <a class="btn btn-primary login-sso hidden" id="ssoBtn" href="#">
+                <i class="ri-shield-keyhole-line"></i> <span id="ssoLabel">Entrar con SSO</span>
+            </a>
+
+            <div class="login-sep hidden" id="loginSep"><span>o</span></div>
+
+            <form class="login-form hidden" id="loginForm" autocomplete="on">
+                <div class="form-group">
+                    <label for="loginUser">Usuario</label>
+                    <input type="text" class="input" id="loginUser" autocomplete="username" required autofocus>
+                </div>
+                <div class="form-group">
+                    <label for="loginPass">Contrasena</label>
+                    <input type="password" class="input" id="loginPass" autocomplete="current-password" required>
+                </div>
+                <button type="submit" class="btn btn-secondary login-submit" id="loginSubmit">
+                    <i class="ri-login-box-line"></i> Entrar
+                </button>
+            </form>
+
+            <p class="login-foot" id="loginFoot"></p>
+        </div>
+    </main>
+
+    <script src="js/i18n-en.js?v=__BUILD__"></script>
+    <script src="js/i18n.js?v=__BUILD__"></script>
+    <script>I18N.init();</script>
+    <script>
+    (function () {
+        const params = new URLSearchParams(location.search);
+        const next = params.get('next') || '/';
+        const errEl = document.getElementById('loginError');
+        const showError = (msg) => {
+            errEl.querySelector('span').textContent = I18N.t(msg);
+            errEl.classList.remove('hidden');
+        };
+        const ERRORS = {
+            oidc_disabled: 'El inicio de sesion con SSO no esta activado',
+            oidc_unavailable: 'No se pudo contactar con el proveedor de SSO',
+            oidc_denied: 'El proveedor de SSO ha cancelado o denegado el acceso',
+            oidc_state: 'La sesion de SSO ha caducado, vuelve a intentarlo',
+            oidc_group: 'Tu usuario no tiene permiso para entrar en NetTools',
+            oidc_failed: 'No se pudo completar el inicio de sesion con SSO',
+        };
+        if (params.get('error')) showError(ERRORS[params.get('error')] || 'No se pudo iniciar sesion');
+
+        fetch('/api/auth/status').then(r => r.json()).then(st => {
+            if (!st.enabled || st.authenticated) {
+                location.replace(next.startsWith('/') ? next : '/' + next);
+                return;
+            }
+            const m = st.methods || {};
+            if (m.oidc) {
+                const sso = document.getElementById('ssoBtn');
+                sso.href = '/api/auth/oidc/start?next=' + encodeURIComponent(next);
+                document.getElementById('ssoLabel').textContent = I18N.t('Entrar con {name}', { name: m.oidc_name || 'SSO' });
+                sso.classList.remove('hidden');
+            }
+            if (m.local || m.ldap) document.getElementById('loginForm').classList.remove('hidden');
+            if (m.oidc && (m.local || m.ldap)) document.getElementById('loginSep').classList.remove('hidden');
+        }).catch(() => showError('No se pudo conectar con el servidor'));
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errEl.classList.add('hidden');
+            const btn = document.getElementById('loginSubmit');
+            btn.disabled = true;
+            try {
+                const r = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: document.getElementById('loginUser').value.trim(),
+                        password: document.getElementById('loginPass').value,
+                    }),
+                });
+                if (r.ok) {
+                    location.replace(next.startsWith('/') ? next : '/' + next);
+                    return;
+                }
+                const body = await r.json().catch(() => ({}));
+                showError(body.detail || 'No se pudo iniciar sesion');
+                document.getElementById('loginPass').select();
+            } catch (err) {
+                showError('No se pudo conectar con el servidor');
+            } finally {
+                btn.disabled = false;
+            }
+        });
+    })();
+    </script>
+</body>
+</html>
