@@ -190,7 +190,20 @@ const API = {
         }
     },
 
-    // --- Bulk device changes ---
+    // --- Notifications (bell) ---
+    notifications: {
+        async list(limit = 50) {
+            return API.request(`/notifications?limit=${limit}`);
+        },
+        async read(id) {
+            return API.request(`/notifications/${id}/read`, { method: 'POST' });
+        },
+        async readAll() {
+            return API.request('/notifications/read-all', { method: 'POST' });
+        },
+    },
+
+        // --- Bulk device changes ---
     async bulkDevices(data) {
         return API.request('/devices/bulk', { method: 'POST', body: JSON.stringify(data) });
     },

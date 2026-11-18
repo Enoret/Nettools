@@ -10,6 +10,7 @@ written by the user).
 import re
 
 PREFIX = 'Posible: '
+PREFIX_EN = 'Possibly: '
 
 # (substring of the lowercase vendor, hint). First match wins: put specific
 # names before generic ones.
@@ -179,6 +180,144 @@ PORT_HINTS = {
 }
 
 
+PRIVATE_ES = ('movil, tablet, portatil o reloj con MAC privada/aleatoria '
+              '(iPhone, Android, Windows o Mac con "direccion privada" activada)')
+PRIVATE_EN = ('phone, tablet, laptop or watch with a private/random MAC '
+              '(iPhone, Android, Windows or Mac with "private address" turned on)')
+
+# English versions of the hints (Spanish is the source text)
+EN = {
+    'camara o sensor Wyze (Tianjin Hualai fabrica los dispositivos Wyze)': 'Wyze camera or sensor (Tianjin Hualai makes Wyze devices)',
+    'camara o sensor Wyze': 'Wyze camera or sensor',
+    'camara EZVIZ (videovigilancia, timbre o mirilla)': 'EZVIZ camera (security camera, doorbell or door viewer)',
+    'camara IP o grabador (NVR/DVR) Hikvision': 'Hikvision IP camera or recorder (NVR/DVR)',
+    'camara IP o grabador Dahua (tambien marca Imou)': 'Dahua IP camera or recorder (also sold as Imou)',
+    'camara IP Reolink': 'Reolink IP camera',
+    'robot aspirador Roborock': 'Roborock robot vacuum',
+    'robot aspirador Ecovacs': 'Ecovacs robot vacuum',
+    'robot aspirador Roomba': 'Roomba robot vacuum',
+    'robot aspirador Dreame': 'Dreame robot vacuum',
+    'enchufe, bombilla, sensor o interruptor inteligente (app Tuya / Smart Life)': 'smart plug, bulb, sensor or switch (Tuya / Smart Life app)',
+    'dispositivo IoT con chip ESP32/ESP8266: enchufe, bombilla, rele (Shelly, Sonoff...), sensor o proyecto DIY': 'IoT device with an ESP32/ESP8266 chip: plug, bulb, relay (Shelly, Sonoff...), sensor or DIY project',
+    'rele o enchufe inteligente Shelly': 'Shelly smart relay or plug',
+    'interruptor o enchufe Sonoff': 'Sonoff switch or plug',
+    'dispositivo IoT con chip WiFi AltoBeam, muy usado en camaras WiFi economicas': 'IoT device with an AltoBeam WiFi chip, common in cheap WiFi cameras',
+    'modulo WiFi de un dispositivo IoT (habitual en camaras, enchufes o electrodomesticos chinos)': 'WiFi module of an IoT device (common in Chinese cameras, plugs or appliances)',
+    'modulo WiFi de un electrodomestico o TV': 'WiFi module of an appliance or TV',
+    'dispositivo IoT con chip Beken (enchufes, bombillas, camaras baratas)': 'IoT device with a Beken chip (plugs, bulbs, cheap cameras)',
+    'tarjeta de red de un PC, TV box o dispositivo IoT con chip Realtek': 'network card of a PC, TV box or IoT device with a Realtek chip',
+    'dispositivo con chip MediaTek (TV, router, movil o IoT)': 'device with a MediaTek chip (TV, router, phone or IoT)',
+    'dispositivo con chip Broadcom (router, TV, PC...)': 'device with a Broadcom chip (router, TV, PC...)',
+    'modulo WiFi Murata (consolas, altavoces, electrodomesticos...)': 'Murata WiFi module (consoles, speakers, appliances...)',
+    'tarjeta WiFi AzureWave (portatil, TV o consola)': 'AzureWave WiFi card (laptop, TV or console)',
+    'modulo WiFi USI (portatil, TV o consola)': 'USI WiFi module (laptop, TV or console)',
+    'equipo fabricado por Foxconn: PC, consola, TV o router': 'device made by Foxconn: PC, console, TV or router',
+    'tarjeta WiFi Lite-On de un portatil o PC': 'Lite-On WiFi card of a laptop or PC',
+    'PC o portatil (tarjeta de red Intel)': 'PC or laptop (Intel network card)',
+    'modulo WiFi LG Innotek: electrodomestico o TV LG': 'LG Innotek WiFi module: LG appliance or TV',
+    'TV, barra de sonido o electrodomestico LG (ThinQ)': 'LG TV, soundbar or appliance (ThinQ)',
+    'movil, tablet, TV o electrodomestico Samsung': 'Samsung phone, tablet, TV or appliance',
+    'consola PlayStation': 'PlayStation console',
+    'TV Bravia, consola PlayStation o movil Sony': 'Sony Bravia TV, PlayStation console or Sony phone',
+    'consola Nintendo (Switch)': 'Nintendo console (Switch)',
+    'Xbox o equipo Surface': 'Xbox or Surface device',
+    'Steam Deck': 'Steam Deck',
+    'dispositivo Apple: iPhone, iPad, Mac, Apple TV, HomePod o Apple Watch': 'Apple device: iPhone, iPad, Mac, Apple TV, HomePod or Apple Watch',
+    'dispositivo Google: Chromecast, Nest (altavoz, termostato, camara) o Pixel': 'Google device: Chromecast, Nest (speaker, thermostat, camera) or Pixel',
+    'dispositivo Amazon: Echo/Alexa, Fire TV, Kindle o Ring': 'Amazon device: Echo/Alexa, Fire TV, Kindle or Ring',
+    'timbre o camara Ring': 'Ring doorbell or camera',
+    'altavoz Sonos': 'Sonos speaker',
+    'altavoz o barra de sonido Bose': 'Bose speaker or soundbar',
+    'puente o bombilla Philips Hue': 'Philips Hue bridge or bulb',
+    'puente Philips Hue, TV o electrodomestico Philips': 'Philips Hue bridge, Philips TV or appliance',
+    'puente o dispositivo IKEA Home smart (Dirigera / Tradfri)': 'IKEA Home smart hub or device (Dirigera / Tradfri)',
+    'termostato, camara o estacion meteorologica Netatmo': 'Netatmo thermostat, camera or weather station',
+    'termostato o puente tado': 'tado thermostat or bridge',
+    'dispositivo Xiaomi: movil, camara, robot aspirador, enchufe, sensor o TV box (app Mi Home)': 'Xiaomi device: phone, camera, robot vacuum, plug, sensor or TV box (Mi Home app)',
+    'reproductor Roku': 'Roku player',
+    'NVIDIA Shield o PC con tarjeta NVIDIA': 'NVIDIA Shield or PC with an NVIDIA card',
+    'Raspberry Pi (Home Assistant, Pi-hole, servidor casero...)': 'Raspberry Pi (Home Assistant, Pi-hole, home server...)',
+    'NAS Synology': 'Synology NAS',
+    'NAS QNAP': 'QNAP NAS',
+    'NAS o adaptador de red UGREEN': 'UGREEN NAS or network adapter',
+    'disco en red WD My Cloud': 'WD My Cloud network drive',
+    'maquina virtual o contenedor LXC en Proxmox': 'virtual machine or LXC container on Proxmox',
+    'maquina virtual VMware': 'VMware virtual machine',
+    'maquina virtual (QEMU/KVM)': 'virtual machine (QEMU/KVM)',
+    'maquina virtual (KVM/virtio)': 'virtual machine (KVM/virtio)',
+    'equipo UniFi/Ubiquiti: punto de acceso, switch, router o camara': 'UniFi/Ubiquiti device: access point, switch, router or camera',
+    'equipo TP-Link: router, punto de acceso, repetidor, enchufe o camara Tapo': 'TP-Link device: router, access point, extender, plug or Tapo camera',
+    'router, switch o repetidor Netgear': 'Netgear router, switch or extender',
+    'router o switch MikroTik': 'MikroTik router or switch',
+    'equipo de red Cisco/Linksys': 'Cisco/Linksys network device',
+    'router ASUS o PC/portatil ASUS': 'ASUS router or ASUS PC/laptop',
+    'router o repetidor FRITZ!Box': 'FRITZ!Box router or repeater',
+    'router del operador (Sagemcom)': 'ISP router (Sagemcom)',
+    'router del operador (Askey)': 'ISP router (Askey)',
+    'router del operador (Arcadyan)': 'ISP router (Arcadyan)',
+    'router del operador o movil ZTE': 'ISP router or ZTE phone',
+    'movil, tablet o router Huawei': 'Huawei phone, tablet or router',
+    'movil o tablet Honor': 'Honor phone or tablet',
+    'movil Oppo': 'Oppo phone',
+    'movil OnePlus': 'OnePlus phone',
+    'movil Vivo': 'Vivo phone',
+    'movil Realme': 'Realme phone',
+    'movil Motorola': 'Motorola phone',
+    'impresora o PC HP': 'HP printer or PC',
+    'impresora Brother': 'Brother printer',
+    'impresora o camara Canon': 'Canon printer or camera',
+    'impresora Epson': 'Epson printer',
+    'PC, portatil o servidor Dell': 'Dell PC, laptop or server',
+    'PC, portatil o tablet Lenovo': 'Lenovo PC, laptop or tablet',
+    'PC o mini PC con placa Gigabyte': 'PC or mini PC with a Gigabyte board',
+    'PC o portatil MSI': 'MSI PC or laptop',
+    'coche o Powerwall Tesla': 'Tesla car or Powerwall',
+    'electrodomestico Bosch/Siemens/Balay (Home Connect)': 'Bosch/Siemens appliance (Home Connect)',
+    'electrodomestico Miele': 'Miele appliance',
+    'aire acondicionado Daikin': 'Daikin air conditioner',
+    'TV, aire acondicionado o camara Panasonic': 'Panasonic TV, air conditioner or camera',
+    'TV Hisense': 'Hisense TV',
+    'TV TCL': 'TCL TV',
+    'bascula o reloj Withings': 'Withings scale or watch',
+    'reloj o dispositivo Garmin': 'Garmin watch or device',
+    'reloj inteligente': 'smartwatch',
+    'movil o tablet Samsung Galaxy': 'Samsung Galaxy phone or tablet',
+    'movil Android': 'Android phone',
+    'altavoz o pantalla Google Nest': 'Google Nest speaker or display',
+    'rele Shelly': 'Shelly relay',
+    'enchufe o rele con firmware Tasmota/Sonoff': 'plug or relay with Tasmota/Sonoff firmware',
+    'dispositivo ESP32/ESP8266 (IoT/DIY)': 'ESP32/ESP8266 device (IoT/DIY)',
+    'camara Wyze': 'Wyze camera',
+    'camara EZVIZ': 'EZVIZ camera',
+    'camara Hikvision': 'Hikvision camera',
+    'Nintendo Switch o switch de red': 'Nintendo Switch or network switch',
+    'impresora HP': 'HP printer',
+    'impresora Canon': 'Canon printer',
+    'PC con Windows': 'Windows PC',
+    'camara (RTSP, puerto 554)': 'camera (RTSP, port 554)',
+    'camara (RTSP)': 'camera (RTSP)',
+    'camara o grabador Dahua': 'Dahua camera or recorder',
+    'servicio web en el 8000 (camaras Hikvision usan este puerto)': 'web service on port 8000 (Hikvision cameras use this port)',
+    'impresora (puerto 9100)': 'printer (port 9100)',
+    'impresora (IPP, puerto 631)': 'printer (IPP, port 631)',
+    'impresora (LPD, puerto 515)': 'printer (LPD, port 515)',
+    'iPhone o iPad (puerto 62078)': 'iPhone or iPad (port 62078)',
+    'dispositivo AirPlay (Apple TV, HomePod, altavoz o TV)': 'AirPlay device (Apple TV, HomePod, speaker or TV)',
+    'broker MQTT (domotica)': 'MQTT broker (home automation)',
+    'servidor Proxmox VE': 'Proxmox VE server',
+    'servicio en el puerto 5000 (receptor AirPlay de un Mac, o NAS Synology)': 'service on port 5000 (AirPlay receiver of a Mac, or Synology NAS)',
+    'NAS Synology (DSM)': 'Synology NAS (DSM)',
+    'NAS o Mac con comparticion de archivos (AFP)': 'NAS or Mac with file sharing (AFP)',
+    'servidor Plex': 'Plex server',
+    'servidor Jellyfin/Emby': 'Jellyfin/Emby server',
+    'PC con Windows (Escritorio remoto)': 'Windows PC (Remote Desktop)',
+    'PC o NAS con carpetas compartidas (SMB)': 'PC or NAS with shared folders (SMB)',
+    'servidor DNS (router, Pi-hole o AdGuard)': 'DNS server (router, Pi-hole or AdGuard)',
+    'equipo con Linux/SSH': 'Linux/SSH device',
+    'tiene interfaz web: abre su IP en el navegador': 'has a web interface: open its IP in the browser',
+    PRIVATE_ES: PRIVATE_EN,
+}
+
 def _vendor_hint(brand: str) -> str:
     b = (brand or '').lower()
     if not b or b.startswith('('):
@@ -218,7 +357,7 @@ def _is_private_mac(mac: str) -> bool:
         return False
 
 
-def guess(device: dict, ports: list = None) -> str:
+def guess(device: dict, ports: list = None, lang: str = 'es') -> str:
     """Description hint for a device, '' if there is nothing useful to say."""
     parts = []
     host = _hostname_hint(device.get('hostname'))
@@ -233,8 +372,7 @@ def guess(device: dict, ports: list = None) -> str:
         parts.append(port)
 
     if not parts and _is_private_mac(device.get('mac_address')):
-        parts.append('movil, tablet, portatil o reloj con MAC privada/aleatoria '
-                     '(iPhone, Android, Windows o Mac con "direccion privada" activada)')
+        parts.append(PRIVATE_ES)
     if not parts and not device.get('mac_address'):
         return ''
     if not parts:
@@ -245,4 +383,6 @@ def guess(device: dict, ports: list = None) -> str:
         if p.lower() not in seen:
             seen.add(p.lower())
             unique.append(p)
+    if lang == 'en':
+        return PREFIX_EN + ' · '.join(EN.get(p, p) for p in unique)
     return PREFIX + ' · '.join(unique)

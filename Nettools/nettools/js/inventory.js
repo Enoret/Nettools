@@ -138,7 +138,7 @@ const InventoryPage = {
 
     formatPrice(v) {
         if (v === null || v === undefined || v === '') return '';
-        return Number(v).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+        return Number(v).toLocaleString(I18N.locale, { style: 'currency', currency: 'EUR' });
     },
 
     isRetired(item) {
@@ -240,12 +240,12 @@ const InventoryPage = {
 
     renderSerial(i) {
         if (!this.isVirtual(i)) {
-            return this.esc(i.serial_number) || '<span class="inv-muted">-</span>';
+            return i.serial_number ? `<span translate="no">${this.esc(i.serial_number)}</span>` : '<span class="inv-muted">-</span>';
         }
         const badge = `<span class="inv-kind-badge ${i.asset_kind}" title="${this.KIND_NAMES[i.asset_kind] || ''}: no es un dispositivo fisico">` +
                       `${this.KIND_LABELS[i.asset_kind] || i.asset_kind}</span>`;
-        const id = i.serial_number ? ` ${this.esc(i.serial_number)}` : '';
-        const host = i.host ? `<div class="inv-sub">en ${this.esc(i.host)}</div>` : '';
+        const id = i.serial_number ? ` <span translate="no">${this.esc(i.serial_number)}</span>` : '';
+        const host = i.host ? `<div class="inv-sub">${I18N.t('en')} <span translate="no">${this.esc(i.host)}</span></div>` : '';
         return badge + id + host;
     },
 
@@ -324,7 +324,7 @@ const InventoryPage = {
                     <div class="inv-name">
                         ${this.logoTile(i.brand, icon)}
                         <div>
-                            <div class="inv-title">${this.esc(i.name || 'Sin nombre')}
+                            <div class="inv-title"><span translate="no">${this.esc(i.name || '')}</span>${i.name ? '' : I18N.t('Sin nombre')}
                                 ${this.isRetired(i) ? '<span class="device-badge badge-new">De baja</span>' : ''}</div>
                             ${typeName ? `<div class="inv-sub">${typeName}</div>` : ''}
                         </div>
@@ -333,12 +333,12 @@ const InventoryPage = {
             }
             case 'brand': {
                 const bm = [i.brand, i.model].filter(Boolean).map(v => this.esc(v)).join(' · ');
-                return `<td>${bm || muted}</td>`;
+                return `<td translate="no">${bm || muted}</td>`;
             }
             case 'serial_number':
                 return `<td class="mono">${this.renderSerial(i)}</td>`;
             case 'location':
-                return `<td>${text(i.location)}</td>`;
+                return `<td translate="no">${text(i.location)}</td>`;
             case 'ip_address': {
                 let net;
                 if (i.device_id === null) {
@@ -351,7 +351,7 @@ const InventoryPage = {
                     net = `<span class="inv-net"><span class="device-status-dot ${online ? 'online' : 'offline'}"></span>` +
                           `${this.esc(i.current_ip || i.ip_address || '-')}</span>`;
                     net += `<div class="inv-sub">${online ? 'En linea' : 'Desconectado'}` +
-                           `${i.network_name ? ' · ' + this.esc(i.network_name) : ''}</div>`;
+                           `${i.network_name ? ' · <span translate="no">' + this.esc(i.network_name) + '</span>' : ''}</div>`;
                 }
                 return `<td class="mono">${net}</td>`;
             }
@@ -368,19 +368,19 @@ const InventoryPage = {
             case 'purchase_price':
                 return `<td class="num">${this.formatPrice(i.purchase_price) || muted}</td>`;
             case 'supplier':
-                return `<td>${text(i.supplier)}</td>`;
+                return `<td translate="no">${text(i.supplier)}</td>`;
             case 'asset_kind':
                 return `<td>${this.KIND_NAMES[i.asset_kind || 'physical']}</td>`;
             case 'host':
-                return `<td>${text(i.host)}</td>`;
+                return `<td translate="no">${text(i.host)}</td>`;
             case 'mac_address':
                 return `<td class="mono">${text(i.mac_address)}</td>`;
             case 'device_type':
                 return `<td>${i.device_type && i.device_type !== 'other' ? Utils.getDeviceTypeName(i.device_type) : muted}</td>`;
             case 'description':
-                return `<td class="inv-wrap">${text(i.description)}</td>`;
+                return `<td class="inv-wrap" translate="no">${text(i.description)}</td>`;
             case 'notes':
-                return `<td class="inv-wrap">${text(i.notes)}</td>`;
+                return `<td class="inv-wrap" translate="no">${text(i.notes)}</td>`;
             default:
                 return '<td></td>';
         }
@@ -600,9 +600,9 @@ const InventoryPage = {
     async remove() {
         if (!this.current) return;
         const linked = this.current.device_id !== null;
-        const msg = linked
-            ? `Quitar "${this.current.name}" del inventario?\n\nSigue guardado en Net Alert, pero no volvera a aparecer en el inventario. Si prefieres conservar la ficha, marcalo "De baja".`
-            : `Eliminar "${this.current.name}" del inventario? Se pierde su ficha.`;
+        const msg = I18N.t(linked
+            ? 'Quitar "{name}" del inventario?\n\nSigue guardado en Net Alert, pero no volvera a aparecer en el inventario. Si prefieres conservar la ficha, marcalo "De baja".'
+            : 'Eliminar "{name}" del inventario? Se pierde su ficha.', { name: this.current.name });
         if (!confirm(msg)) return;
         try {
             await API.inventory.remove(this.current.id);
@@ -618,37 +618,39 @@ const InventoryPage = {
     exportCsv() {
         const list = this.sorted(this.getFiltered());
         const cols = [
-            ['Nombre', i => i.name],
-            ['Tipo', i => (i.device_type && i.device_type !== 'other') ? Utils.getDeviceTypeName(i.device_type) : ''],
-            ['Estado', i => this.isRetired(i) ? 'De baja' : 'En uso'],
-            ['Marca', i => i.brand],
-            ['Modelo', i => i.model],
-            ['Tipo de activo', i => this.KIND_NAMES[i.asset_kind || 'physical']],
-            ['Numero de serie / ID', i => i.serial_number],
-            ['Anfitrion', i => i.host],
-            ['Ubicacion', i => i.location],
-            ['IP', i => i.current_ip || i.ip_address],
-            ['MAC', i => i.mac_address],
-            ['Red', i => i.network_name],
-            ['En Net Alert', i => i.device_id === null ? 'No' : 'Si'],
-            ['Fecha de compra', i => this.formatDate(i.purchase_date)],
-            ['Precio (EUR)', i => i.purchase_price == null ? '' : String(i.purchase_price).replace('.', ',')],
-            ['Garantia hasta', i => this.formatDate(i.warranty_until)],
-            ['Tienda / Proveedor', i => i.supplier],
-            ['Descripcion', i => i.description],
-            ['Notas', i => i.notes],
+            [I18N.t('Nombre'), i => i.name],
+            [I18N.t('Tipo'), i => (i.device_type && i.device_type !== 'other') ? Utils.getDeviceTypeName(i.device_type) : ''],
+            [I18N.t('Estado'), i => I18N.t(this.isRetired(i) ? 'De baja' : 'En uso')],
+            [I18N.t('Marca'), i => i.brand],
+            [I18N.t('Modelo'), i => i.model],
+            [I18N.t('Tipo de activo'), i => I18N.t(this.KIND_NAMES[i.asset_kind || 'physical'])],
+            [I18N.t('Numero de serie / ID'), i => i.serial_number],
+            [I18N.t('Anfitrion'), i => i.host],
+            [I18N.t('Ubicacion'), i => i.location],
+            [I18N.t('IP'), i => i.current_ip || i.ip_address],
+            [I18N.t('MAC'), i => i.mac_address],
+            [I18N.t('Red'), i => i.network_name],
+            [I18N.t('En Net Alert'), i => i.device_id === null ? I18N.t('No') : I18N.t('Si')],
+            [I18N.t('Fecha de compra'), i => this.formatDate(i.purchase_date)],
+            [I18N.t('Precio (EUR)'), i => i.purchase_price == null ? '' : String(i.purchase_price).replace('.', I18N.lang === 'es' ? ',' : '.')],
+            [I18N.t('Garantia hasta'), i => this.formatDate(i.warranty_until)],
+            [I18N.t('Tienda / Proveedor'), i => i.supplier],
+            [I18N.t('Descripcion'), i => i.description],
+            [I18N.t('Notas'), i => i.notes],
         ];
         const cell = (v) => {
             const s = v == null ? '' : String(v);
-            return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+            return /[";,\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
         };
-        const lines = [cols.map(c => cell(c[0])).join(';')]
-            .concat(list.map(i => cols.map(c => cell(c[1](i))).join(';')));
+        // ';' for Spanish Excel, ',' for English
+        const sep = I18N.lang === 'es' ? ';' : ',';
+        const lines = [cols.map(c => cell(c[0])).join(sep)]
+            .concat(list.map(i => cols.map(c => cell(c[1](i))).join(sep)));
         // BOM + ';' so Excel (Spanish locale) opens it with accents and columns
         const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `inventario-nettools-${new Date().toISOString().slice(0, 10)}.csv`;
+        a.download = `${I18N.lang === 'en' ? 'inventory' : 'inventario'}-nettools-${new Date().toISOString().slice(0, 10)}.csv`;
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -656,9 +658,11 @@ const InventoryPage = {
     },
 
     print() {
-        const filterName = document.querySelector('#inventoryFilters .filter-btn.active').textContent;
+        const filterName = document.querySelector('#inventoryFilters .filter-btn.active').textContent.trim();
         document.getElementById('inventoryPrintDate').textContent =
-            `${new Date().toLocaleDateString('es-ES')} · ${filterName} · ${this.getFiltered().length} elementos`;
+            I18N.t('{date} · {filter} · {n} elementos', {
+                date: new Date().toLocaleDateString(I18N.locale), filter: filterName, n: this.getFiltered().length,
+            });
         window.print();
     },
 };

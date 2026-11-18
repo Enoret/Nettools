@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="Nettools/nettools/assets/logo.svg" alt="NetTools Logo" width="80" height="80">
+  <img src="Nettools/nettools/assets/logo.png" alt="NetTools Logo" width="96" height="96">
 </p>
 
 <h1 align="center">NetTools</h1>
@@ -27,7 +27,7 @@
 
 ## Description
 
-**NetTools** is a self-hosted web application to monitor your local network and measure your Internet connection speed. It provides a modern, responsive interface with three main modules: **Net Speed** (speed tests), **Net Alert** (device discovery) and **Net Check** (diagnostic tools).
+**NetTools** is a self-hosted web application to monitor your local network and measure your Internet connection speed. It provides a modern, responsive interface with four main modules: **Net Speed** (speed tests), **Net Alert** (device discovery), **Inventory** (asset sheets) and **Net Check** (diagnostic tools).
 
 ### Key Features
 
@@ -41,6 +41,8 @@
 - **Telegram** notifications: new devices, scheduled speed test results, opened/closed ports
 - Automatic cleanup of stale unsaved devices and configurable data retention
 - Interactive charts with speed, latency and device history
+- **English and Spanish** interface (automatic from the browser language, or fixed in Settings); Telegram messages and hints follow the language
+- **Notifications bell**: the same events sent to Telegram (new devices, scheduled speed tests, port changes), with read / mark-all-read, even without Telegram
 - Light, dark and auto themes, customizable accent colors, configurable timezone
 - Full REST API
 - Self-hosted: your data never leaves your server (only brand names are sent to Simple Icons / Google to fetch manufacturer logos)
@@ -81,6 +83,11 @@
 - Items that are not on the network can be added by hand
 - Manufacturer logos (automatic or uploaded), warranty expiry badges, total value
 - Configurable columns, CSV export (Excel) and print / PDF view
+
+### Interface
+- Full-width top bar with notifications bell and light / system / dark theme selector
+- Collapsible side menu, section title and live status (backend connection, auto test / scan) in each section
+- English and Spanish, chosen automatically from the browser language (Settings → General → Language to force one)
 
 ### Net Check
 - **Ping**: single IP or all saved devices

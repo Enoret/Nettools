@@ -4,24 +4,58 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NetTools - Monitor de Red</title>
-    <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+    <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/remixicon@4.1.0/fonts/remixicon.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <link rel="stylesheet" href="css/style.css?v=__BUILD__">
 </head>
 <body>
+    <!-- Top bar (full width) -->
+    <header class="topbar" id="topbar">
+        <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Menu">
+            <i class="ri-menu-line"></i>
+        </button>
+        <a class="topbar-brand" href="#speed" id="topbarBrand">
+            <img src="assets/logo-64.png" class="brand-logo" alt="">
+            <span class="logo-text">NetTools</span>
+        </a>
+        <div class="topbar-actions">
+            <div class="notif-wrap">
+                <button class="topbar-icon-btn" id="notifBtn" title="Notificaciones" aria-label="Notificaciones">
+                    <i class="ri-notification-3-line"></i>
+                    <span class="notif-badge hidden" id="notifBadge">0</span>
+                </button>
+                <div class="notif-panel hidden" id="notifPanel">
+                    <div class="notif-header">
+                        <span class="notif-title">Notificaciones</span>
+                        <button class="notif-readall" id="notifReadAll">
+                            <i class="ri-check-double-line"></i> Marcar todas como leidas
+                        </button>
+                    </div>
+                    <div class="notif-list" id="notifList"></div>
+                </div>
+            </div>
+            <div class="theme-switcher" role="group" aria-label="Tema">
+                <button class="theme-btn" data-theme="light" title="Tema Claro">
+                    <i class="ri-sun-line"></i>
+                </button>
+                <button class="theme-btn active" data-theme="system" title="Tema del Sistema">
+                    <i class="ri-computer-line"></i>
+                </button>
+                <button class="theme-btn" data-theme="dark" title="Tema Oscuro">
+                    <i class="ri-moon-clear-line"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <div class="sidebar-logo">
-                <div class="logo-icon">
-                    <i class="ri-global-line"></i>
-                </div>
-                <span class="logo-text">NetTools</span>
-            </div>
-            <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
-                <i class="ri-menu-fold-line"></i>
+        <div class="sidebar-top">
+            <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar" title="Contraer menu">
+                <i class="ri-layout-left-line"></i>
             </button>
         </div>
 
@@ -62,18 +96,7 @@
         </div>
 
         <div class="sidebar-footer">
-            <div class="theme-switcher">
-                <button class="theme-btn" data-theme="light" title="Tema Claro">
-                    <i class="ri-sun-line"></i>
-                </button>
-                <button class="theme-btn active" data-theme="system" title="Tema del Sistema">
-                    <i class="ri-computer-line"></i>
-                </button>
-                <button class="theme-btn" data-theme="dark" title="Tema Oscuro">
-                    <i class="ri-moon-line"></i>
-                </button>
-            </div>
-            <div class="sidebar-version">v1.1.3</div>
+            <div class="sidebar-version">v1.2.0</div>
             <div class="sidebar-credit"><a href="https://braut.es" target="_blank">braut.es</a></div>
         </div>
     </aside>
@@ -83,27 +106,23 @@
 
     <!-- Main content -->
     <main class="main-content" id="mainContent">
-        <!-- Top bar -->
-        <header class="topbar">
-            <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Menu">
-                <i class="ri-menu-line"></i>
-            </button>
-            <div class="topbar-title" id="topbarTitle">
+        <!-- Section header: title + status -->
+        <div class="page-header">
+            <div class="page-title" id="topbarTitle">
                 <i class="ri-speed-up-line"></i>
                 <h1>Net Speed</h1>
             </div>
-            <div class="topbar-actions">
+            <div class="page-status">
                 <span class="auto-status-indicator" id="autoStatusIndicator">
                     <i class="ri-refresh-line"></i>
                     <span id="autoStatusText">Cargando...</span>
                 </span>
-                <div class="topbar-separator"></div>
-                <div class="connection-status" id="connectionStatus">
+                <div class="connection-status" id="connectionStatus" title="Conexion con el backend">
                     <span class="status-dot online"></span>
                     <span class="status-text">Conectado</span>
                 </div>
             </div>
-        </header>
+        </div>
 
         <!-- Page: Net Speed -->
         <section class="page active" id="page-speed">
@@ -490,23 +509,23 @@
                             <input type="text" id="deviceSearch" placeholder="Buscar dispositivo..." class="input">
                         </div>
                         <div class="filter-group">
-                            <button class="filter-btn active" data-filter="all">Todos</button>
-                            <button class="filter-btn" data-filter="online">En linea</button>
-                            <button class="filter-btn" data-filter="offline">Desconectados</button>
-                            <button class="filter-btn" data-filter="new">Nuevos</button>
-                            <button class="filter-btn" data-filter="saved">Guardados</button>
-                            <button class="filter-btn" data-filter="manual">Manuales</button>
+                            <button class="filter-btn active" data-filter="all"><i class="ri-apps-2-line"></i>Todos</button>
+                            <button class="filter-btn" data-filter="online"><i class="ri-wifi-line"></i>En linea</button>
+                            <button class="filter-btn" data-filter="offline"><i class="ri-wifi-off-line"></i>Desconectados</button>
+                            <button class="filter-btn" data-filter="new"><i class="ri-alarm-warning-line"></i>Nuevos</button>
+                            <button class="filter-btn" data-filter="saved"><i class="ri-bookmark-line"></i>Guardados</button>
+                            <button class="filter-btn" data-filter="manual"><i class="ri-edit-box-line"></i>Manuales</button>
                         </div>
                     </div>
                     <div class="toolbar-right">
-                        <button class="btn btn-secondary" id="netalertColumnsBtn" title="Elegir y ordenar columnas">
-                            <i class="ri-layout-column-line"></i> Columnas
+                        <button class="btn btn-secondary btn-icon" id="netalertColumnsBtn" title="Elegir y ordenar columnas" aria-label="Columnas">
+                            <i class="ri-layout-column-line"></i>
                         </button>
                         <button class="btn btn-secondary" id="scanNetworkBtn">
                             <i class="ri-radar-line"></i> Escanear Red
                         </button>
-                        <button class="btn btn-primary" id="addDeviceBtn">
-                            <i class="ri-add-line"></i> Nuevo Dispositivo
+                        <button class="btn btn-primary" id="addDeviceBtn" title="Nuevo Dispositivo">
+                            <i class="ri-add-line"></i> Nuevo
                         </button>
                     </div>
                 </div>
@@ -615,31 +634,31 @@
                             <input type="text" id="inventorySearch" placeholder="Buscar en el inventario..." class="input">
                         </div>
                         <div class="filter-group" id="inventoryFilters">
-                            <button class="filter-btn active" data-filter="active">En uso</button>
-                            <button class="filter-btn" data-filter="warranty">Garantia por caducar</button>
-                            <button class="filter-btn" data-filter="physical">Fisicos</button>
-                            <button class="filter-btn" data-filter="virtual">Virtuales</button>
-                            <button class="filter-btn" data-filter="offnet">Fuera de Net Alert</button>
-                            <button class="filter-btn" data-filter="retired">De baja</button>
-                            <button class="filter-btn" data-filter="all">Todos</button>
+                            <button class="filter-btn active" data-filter="active"><i class="ri-checkbox-circle-line"></i>En uso</button>
+                            <button class="filter-btn" data-filter="warranty" title="Garantia por caducar (menos de 90 dias)"><i class="ri-shield-check-line"></i>Garantia</button>
+                            <button class="filter-btn" data-filter="physical"><i class="ri-hard-drive-2-line"></i>Fisicos</button>
+                            <button class="filter-btn" data-filter="virtual"><i class="ri-stack-line"></i>Virtuales</button>
+                            <button class="filter-btn" data-filter="offnet" title="Fuera de Net Alert"><i class="ri-link-unlink"></i>Sin red</button>
+                            <button class="filter-btn" data-filter="retired"><i class="ri-inbox-archive-line"></i>De baja</button>
+                            <button class="filter-btn" data-filter="all"><i class="ri-apps-2-line"></i>Todos</button>
                         </div>
                     </div>
                     <div class="toolbar-right">
-                        <button class="btn btn-secondary" id="inventoryColumnsBtn" title="Elegir y ordenar columnas">
-                            <i class="ri-layout-column-line"></i> Columnas
+                        <button class="btn btn-secondary btn-icon" id="inventoryColumnsBtn" title="Elegir y ordenar columnas" aria-label="Columnas">
+                            <i class="ri-layout-column-line"></i>
                         </button>
-                        <button class="btn btn-secondary" id="inventoryCsvBtn" title="Descargar CSV (Excel)">
-                            <i class="ri-file-excel-2-line"></i> CSV
+                        <button class="btn btn-secondary btn-icon" id="inventoryCsvBtn" title="Descargar CSV (Excel)" aria-label="CSV">
+                            <i class="ri-file-excel-2-line"></i>
                         </button>
-                        <button class="btn btn-secondary" id="inventoryPrintBtn" title="Imprimir o guardar como PDF">
-                            <i class="ri-printer-line"></i> Imprimir
+                        <button class="btn btn-secondary btn-icon" id="inventoryPrintBtn" title="Imprimir o guardar como PDF" aria-label="Imprimir">
+                            <i class="ri-printer-line"></i>
                         </button>
                         <button class="btn btn-primary" id="inventoryAddBtn">
                             <i class="ri-add-line"></i> Anadir
                         </button>
                     </div>
                 </div>
-                <p class="inventory-help">Los dispositivos <b>guardados</b> y <b>manuales</b> de Net Alert se anaden solos. Aqui puedes completar su ficha (modelo, n&ordm; de serie, compra, garantia...) o anadir material que no esta en la red.</p>
+                <p class="inventory-help">Los dispositivos guardados y manuales de Net Alert se anaden solos. Aqui puedes completar su ficha (modelo, n&ordm; de serie, compra, garantia...) o anadir material que no esta en la red.</p>
             </div>
 
             <div class="print-header">
@@ -719,6 +738,17 @@
                         <h3><i class="ri-global-line"></i> General</h3>
                     </div>
                     <div class="setting-group">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Idioma</label>
+                                <p>Idioma de la interfaz, de los avisos de Telegram y de las pistas de los dispositivos</p>
+                            </div>
+                            <select class="select" id="languageSelect">
+                                <option value="auto">Automatico (idioma del navegador)</option>
+                                <option value="es" translate="no">Español</option>
+                                <option value="en" translate="no">English</option>
+                            </select>
+                        </div>
                         <div class="setting-item">
                             <div class="setting-info">
                                 <label>Zona Horaria</label>
@@ -1002,13 +1032,13 @@
                 <!-- Telegram Notifications -->
                 <div class="section-card">
                     <div class="section-header">
-                        <h3><i class="ri-telegram-line"></i> Notificaciones Telegram</h3>
+                        <h3><i class="ri-notification-3-line"></i> Notificaciones</h3>
                     </div>
                     <div class="setting-group">
                         <div class="setting-item">
                             <div class="setting-info">
                                 <label>Activar Telegram</label>
-                                <p>Enviar notificaciones por Telegram (nuevos dispositivos y tests de velocidad)</p>
+                                <p>Los avisos se muestran siempre en la campana de arriba. Activalo para recibirlos tambien por Telegram.</p>
                             </div>
                             <label class="toggle">
                                 <input type="checkbox" id="telegramEnabled">
@@ -1200,11 +1230,9 @@
                     </div>
                     <div class="about-info">
                         <div class="about-logo">
-                            <div class="logo-icon large">
-                                <i class="ri-global-line"></i>
-                            </div>
+                            <img src="assets/logo.png" class="about-logo-img" alt="NetTools">
                             <h2>NetTools</h2>
-                            <p class="version">Version 1.1.3</p>
+                            <p class="version">Version 1.2.0</p>
                             <p class="about-developer">Desarrollado por <a href="https://braut.es" target="_blank">braut.es</a></p>
                         </div>
                         <div class="about-details">
@@ -1523,12 +1551,12 @@
                 </p>
                 <div class="form-group">
                     <label>Este dispositivo</label>
-                    <div class="merge-device-card" id="mergeThis"></div>
+                    <div class="merge-device-card" id="mergeThis" translate="no"></div>
                 </div>
                 <div class="form-group">
                     <label for="mergeSearch">Es el mismo equipo que</label>
                     <input type="text" class="input" id="mergeSearch" placeholder="Filtrar por nombre, IP, MAC o marca...">
-                    <select class="select merge-select" id="mergeTarget" size="7"></select>
+                    <select translate="no" class="select merge-select" id="mergeTarget" size="7"></select>
                 </div>
                 <div class="form-group">
                     <label for="mergeKeep">Conservar nombre, tipo y ubicacion de</label>
@@ -1609,6 +1637,9 @@
         </div>
     </div>
 
+    <script src="js/i18n-en.js?v=__BUILD__"></script>
+    <script src="js/i18n.js?v=__BUILD__"></script>
+    <script>I18N.init();</script>
     <script src="js/api.js?v=__BUILD__"></script>
     <script src="js/app.js?v=__BUILD__"></script>
     <script src="js/speedtest.js?v=__BUILD__"></script>

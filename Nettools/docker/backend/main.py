@@ -74,7 +74,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="NetTools API",
     description="API para monitoreo de red y tests de velocidad",
-    version="1.1.3",
+    version="1.2.0",
     lifespan=lifespan,
 )
 
@@ -224,6 +224,25 @@ async def get_device_ports(device_id: int):
         'in_progress': is_port_scan_in_progress(device_id),
         'ports': db.get_device_ports(device_id),
     }
+
+
+# ==========================================
+#  NOTIFICATIONS (bell panel)
+# ==========================================
+
+@app.get("/api/notifications")
+async def list_notifications(limit: int = Query(50, ge=1, le=200)):
+    return db.get_notifications(limit)
+
+
+@app.post("/api/notifications/read-all")
+async def read_all_notifications():
+    return {"updated": db.mark_notifications_read()}
+
+
+@app.post("/api/notifications/{notification_id}/read")
+async def read_notification(notification_id: int):
+    return {"updated": db.mark_notifications_read(notification_id)}
 
 
 @app.post("/api/ports/scan-all")
@@ -547,13 +566,21 @@ async def update_settings(data: SettingsUpdate):
                 assert isinstance(cfg, dict) and isinstance(cfg.get('columns'), list) and len(settings_data[key]) < 4000
             except Exception:
                 raise HTTPException(status_code=400, detail="Configuracion de columnas no valida")
+    if settings_data.get('language') not in (None, 'auto', 'es', 'en'):
+        raise HTTPException(status_code=400, detail="Idioma no valido")
+    if settings_data.get('ui_language') not in (None, 'es', 'en'):
+        raise HTTPException(status_code=400, detail="Idioma no valido")
     if settings_data.get('port_scan_profile') not in (None, 'quick', 'full'):
         raise HTTPException(status_code=400, detail="Perfil de escaneo no valido")
     if settings_data.get('port_scan_scope') not in (None, 'online', 'saved'):
         raise HTTPException(status_code=400, detail="Alcance de escaneo no valido")
     if settings_data.get('unifi_auth') not in (None, 'api_key', 'login'):
         raise HTTPException(status_code=400, detail="unifi_auth debe ser 'api_key' o 'login'")
+    old_lang = db.server_language()
     db.update_settings(settings_data)
+    if db.server_language() != old_lang:
+        # device hints are stored as text: regenerate them in the new language
+        db.refresh_hints(hint_service.guess)
 
     # Update scheduler with new settings
     update_schedule()
@@ -575,7 +602,8 @@ async def test_telegram():
         raise HTTPException(status_code=400, detail="Bot Token y Chat ID son obligatorios. Guarda la configuracion primero.")
 
     loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(executor, telegram_test_connection, bot_token, chat_id)
+    result = await loop.run_in_executor(executor, telegram_test_connection, bot_token, chat_id,
+                                        db.server_language(settings))
 
     if result['success']:
         return result

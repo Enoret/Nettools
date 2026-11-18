@@ -62,7 +62,88 @@ def send_telegram_message(bot_token: str, chat_id: str, message: str, parse_mode
         return {"success": False, "error": str(e)}
 
 
-def send_new_device_alert(bot_token: str, chat_id: str, devices: list) -> bool:
+# ---------- Texts (es / en) ----------
+TEXTS = {
+    'es': {
+        'new_one': 'Nuevo dispositivo detectado',
+        'new_many': '{n} nuevos dispositivos detectados',
+        'unknown': 'Desconocido',
+        'no_mac': 'sin MAC (red enrutada)',
+        'brand': 'Marca',
+        'type': 'Tipo',
+        'ports_title': 'NetTools - Cambios en puertos abiertos',
+        'opened': 'Abiertos',
+        'closed': 'Cerrados',
+        'vs_avg': 'vs media 7d',
+        'slow_title': 'NetTools - Velocidad por debajo de lo esperado',
+        'test_title': 'NetTools - Test de velocidad',
+        'download': 'Descarga',
+        'upload': 'Subida',
+        'loss': 'Perdida de paquetes',
+        'server': 'Servidor',
+        'threshold': 'Umbral configurado',
+        'see_result': 'Ver resultado en Speedtest',
+        'failed_title': 'NetTools - Test de velocidad fallido',
+        'failed_body': 'El test programado no se ha podido completar:',
+        'ok_title': 'NetTools - Conexion exitosa',
+        'ok_body': ('Las notificaciones de Telegram estan configuradas correctamente.\n'
+                    'Recibiras alertas cuando se detecten nuevos dispositivos en tu red.'),
+        'no_token': 'Bot Token no configurado',
+        'no_chat': 'Chat ID no configurado',
+        'sent': 'Mensaje de prueba enviado correctamente',
+        'tg_error': 'Error de Telegram: {error}',
+        'unknown_error': 'Error desconocido',
+    },
+    'en': {
+        'new_one': 'New device detected',
+        'new_many': '{n} new devices detected',
+        'unknown': 'Unknown',
+        'no_mac': 'no MAC (routed network)',
+        'brand': 'Brand',
+        'type': 'Type',
+        'ports_title': 'NetTools - Open port changes',
+        'opened': 'Opened',
+        'closed': 'Closed',
+        'vs_avg': 'vs 7-day average',
+        'slow_title': 'NetTools - Speed below expectations',
+        'test_title': 'NetTools - Speed test',
+        'download': 'Download',
+        'upload': 'Upload',
+        'loss': 'Packet loss',
+        'server': 'Server',
+        'threshold': 'Configured threshold',
+        'see_result': 'See the result on Speedtest',
+        'failed_title': 'NetTools - Speed test failed',
+        'failed_body': 'The scheduled test could not be completed:',
+        'ok_title': 'NetTools - Connection successful',
+        'ok_body': ('Telegram notifications are configured correctly.\n'
+                    'You will get alerts when new devices are detected on your network.'),
+        'no_token': 'Bot token not set',
+        'no_chat': 'Chat ID not set',
+        'sent': 'Test message sent',
+        'tg_error': 'Telegram error: {error}',
+        'unknown_error': 'Unknown error',
+    },
+}
+
+TYPE_NAMES = {
+    'es': {'router': 'Router', 'switch': 'Switch', 'ap': 'Punto de acceso', 'server': 'Servidor',
+           'desktop': 'PC', 'laptop': 'Portatil', 'phone': 'Telefono', 'tablet': 'Tablet',
+           'printer': 'Impresora', 'camera': 'Camara', 'iot': 'IoT', 'nas': 'NAS', 'tv': 'Smart TV',
+           'gaming': 'Consola'},
+    'en': {'router': 'Router', 'switch': 'Switch', 'ap': 'Access point', 'server': 'Server',
+           'desktop': 'PC', 'laptop': 'Laptop', 'phone': 'Phone', 'tablet': 'Tablet',
+           'printer': 'Printer', 'camera': 'Camera', 'iot': 'IoT', 'nas': 'NAS', 'tv': 'Smart TV',
+           'gaming': 'Console'},
+}
+
+
+def _t(lang: str, key: str, **kw) -> str:
+    text = TEXTS.get(lang, TEXTS['es']).get(key) or TEXTS['es'][key]
+    return text.format(**kw) if kw else text
+
+
+def send_new_device_alert(bot_token: str, chat_id: str, devices: list, lang: str = 'es') -> bool:
     """Send an alert about newly discovered devices.
 
     `devices` is a list of dicts with keys: ip_address, mac_address, hostname, brand, device_type
@@ -71,23 +152,24 @@ def send_new_device_alert(bot_token: str, chat_id: str, devices: list) -> bool:
         return True
 
     count = len(devices)
-    header = f"🔔 <b>NetTools - {'Nuevo dispositivo detectado' if count == 1 else f'{count} nuevos dispositivos detectados'}</b>\n"
+    title = _t(lang, 'new_one') if count == 1 else _t(lang, 'new_many', n=count)
+    header = f"🔔 <b>NetTools - {title}</b>\n"
 
     lines = []
     for d in devices:
-        name = d.get('hostname') or d.get('ip_address') or 'Desconocido'
-        ip = d.get('ip_address', '-')
-        mac = d.get('mac_address') or 'sin MAC (red enrutada)'
-        brand = d.get('brand', '')
+        name = html.escape(d.get('hostname') or d.get('ip_address') or _t(lang, 'unknown'))
+        ip = html.escape(d.get('ip_address') or '-')
+        mac = html.escape(d.get('mac_address') or _t(lang, 'no_mac'))
+        brand = html.escape(d.get('brand') or '')
         dtype = d.get('device_type', 'other')
 
         line = f"\n📡 <b>{name}</b>"
         line += f"\n   IP: <code>{ip}</code>"
         line += f"\n   MAC: <code>{mac}</code>"
         if brand:
-            line += f"\n   Marca: {brand}"
+            line += f"\n   {_t(lang, 'brand')}: {brand}"
         if dtype and dtype != 'other':
-            line += f"\n   Tipo: {dtype}"
+            line += f"\n   {_t(lang, 'type')}: {TYPE_NAMES.get(lang, TYPE_NAMES['es']).get(dtype, dtype)}"
         lines.append(line)
 
     message = header + "\n".join(lines)
@@ -96,7 +178,7 @@ def send_new_device_alert(bot_token: str, chat_id: str, devices: list) -> bool:
     return result.get("success", False)
 
 
-def send_port_changes_alert(bot_token: str, chat_id: str, changes: list) -> bool:
+def send_port_changes_alert(bot_token: str, chat_id: str, changes: list, lang: str = 'es') -> bool:
     """Ports opened/closed since the previous scan, per device.
     `changes`: [{name, ip, new_ports: [{port, service}], closed_ports: [...]}]"""
     if not changes:
@@ -106,40 +188,39 @@ def send_port_changes_alert(bot_token: str, chat_id: str, changes: list) -> bool
         svc = p.get('service') or ''
         return f"{p['port']}" + (f" ({html.escape(svc)})" if svc else '')
 
-    lines = [f"🚪 <b>NetTools - Cambios en puertos abiertos</b>"]
+    lines = [f"🚪 <b>{_t(lang, 'ports_title')}</b>"]
     for c in changes:
         lines.append(f"\n📡 <b>{html.escape(c['name'] or '')}</b> <code>{html.escape(c['ip'] or '')}</code>")
         if c['new_ports']:
-            lines.append("   🆕 Abiertos: " + ", ".join(fmt(p) for p in c['new_ports']))
+            lines.append(f"   🆕 {_t(lang, 'opened')}: " + ", ".join(fmt(p) for p in c['new_ports']))
         if c['closed_ports']:
-            lines.append("   ✖️ Cerrados: " + ", ".join(fmt(p) for p in c['closed_ports']))
+            lines.append(f"   ✖️ {_t(lang, 'closed')}: " + ", ".join(fmt(p) for p in c['closed_ports']))
     result = send_telegram_message(bot_token, chat_id, "\n".join(lines))
     return result.get("success", False)
 
 
-def _fmt_delta(value, avg) -> str:
+def _fmt_delta(value, avg, lang: str = 'es') -> str:
     """' (+3% vs media 7d)' or '' when there is no average."""
     if value is None or not avg:
         return ''
     pct = (value - avg) / avg * 100
-    return f" <i>({pct:+.0f}% vs media 7d)</i>"
+    return f" <i>({pct:+.0f}% {_t(lang, 'vs_avg')})</i>"
 
 
 def send_speed_test_result(bot_token: str, chat_id: str, result: dict,
-                           averages: dict = None, threshold: float = 0) -> bool:
+                           averages: dict = None, threshold: float = 0, lang: str = 'es') -> bool:
     """Send the result of a scheduled speed test."""
     averages = averages or {}
     dl = result.get('download_speed') or 0
     ul = result.get('upload_speed') or 0
     slow = threshold and (dl < threshold or ul < threshold)
 
-    title = "⚠️ <b>NetTools - Velocidad por debajo de lo esperado</b>" if slow \
-        else "📶 <b>NetTools - Test de velocidad</b>"
+    title = f"⚠️ <b>{_t(lang, 'slow_title')}</b>" if slow else f"📶 <b>{_t(lang, 'test_title')}</b>"
     lines = [
         title,
         "",
-        f"⬇️ Descarga: <b>{dl:.1f} Mbps</b>{_fmt_delta(dl, averages.get('download'))}",
-        f"⬆️ Subida: <b>{ul:.1f} Mbps</b>{_fmt_delta(ul, averages.get('upload'))}",
+        f"⬇️ {_t(lang, 'download')}: <b>{dl:.1f} Mbps</b>{_fmt_delta(dl, averages.get('download'), lang)}",
+        f"⬆️ {_t(lang, 'upload')}: <b>{ul:.1f} Mbps</b>{_fmt_delta(ul, averages.get('upload'), lang)}",
         f"⏱ Ping: {result.get('ping') or 0:.1f} ms · Jitter: {result.get('jitter') or 0:.1f} ms",
     ]
 
@@ -152,50 +233,47 @@ def send_speed_test_result(bot_token: str, chat_id: str, result: dict,
     raw = raw or {}
     loss = raw.get('packetLoss')
     if loss:
-        lines.append(f"📉 Perdida de paquetes: {loss:.1f}%")
+        lines.append(f"📉 {_t(lang, 'loss')}: {loss:.1f}%")
 
     server = result.get('server_location') or result.get('server_name')
     if server:
-        lines.append(f"🌐 Servidor: {html.escape(str(server))}")
+        lines.append(f"🌐 {_t(lang, 'server')}: {html.escape(str(server))}")
     if result.get('isp'):
         lines.append(f"🏢 ISP: {html.escape(str(result['isp']))}")
     if slow:
-        lines.append(f"\nUmbral configurado: {threshold:.0f} Mbps")
+        lines.append(f"\n{_t(lang, 'threshold')}: {threshold:.0f} Mbps")
 
     url = (raw.get('result') or {}).get('url')
     if url:
-        lines.append(f'\n<a href="{html.escape(url)}">Ver resultado en Speedtest</a>')
+        lines.append(f'\n<a href="{html.escape(url)}">{_t(lang, "see_result")}</a>')
 
     return send_telegram_message(bot_token, chat_id, "\n".join(lines)).get('success', False)
 
 
-def send_speed_test_failure(bot_token: str, chat_id: str, error: str) -> bool:
+def send_speed_test_failure(bot_token: str, chat_id: str, error: str, lang: str = 'es') -> bool:
     message = (
-        "❌ <b>NetTools - Test de velocidad fallido</b>\n\n"
-        f"El test programado no se ha podido completar:\n<code>{html.escape(str(error))[:500]}</code>"
+        f"❌ <b>{_t(lang, 'failed_title')}</b>\n\n"
+        f"{_t(lang, 'failed_body')}\n<code>{html.escape(str(error))[:500]}</code>"
     )
     return send_telegram_message(bot_token, chat_id, message).get('success', False)
 
 
-def test_connection(bot_token: str, chat_id: str) -> dict:
+def test_connection(bot_token: str, chat_id: str, lang: str = 'es') -> dict:
     """Send a test message to verify the Telegram configuration.
 
-    Returns dict with 'success' bool and 'message' string.
+    Returns dict with 'success' bool and 'message' string (always in Spanish:
+    the UI translates server messages).
     """
     if not bot_token:
-        return {"success": False, "message": "Bot Token no configurado"}
+        return {"success": False, "message": _t('es', 'no_token')}
     if not chat_id:
-        return {"success": False, "message": "Chat ID no configurado"}
+        return {"success": False, "message": _t('es', 'no_chat')}
 
-    test_msg = (
-        "✅ <b>NetTools - Conexion exitosa</b>\n\n"
-        "Las notificaciones de Telegram estan configuradas correctamente.\n"
-        "Recibiras alertas cuando se detecten nuevos dispositivos en tu red."
-    )
+    test_msg = f"✅ <b>{_t(lang, 'ok_title')}</b>\n\n{_t(lang, 'ok_body')}"
 
     result = send_telegram_message(bot_token, chat_id, test_msg)
     if result.get("success"):
-        return {"success": True, "message": "Mensaje de prueba enviado correctamente"}
+        return {"success": True, "message": _t('es', 'sent')}
     else:
-        error = result.get("error", "Error desconocido")
-        return {"success": False, "message": f"Error de Telegram: {error}"}
+        error = result.get("error", _t('es', 'unknown_error'))
+        return {"success": False, "message": _t('es', 'tg_error', error=error)}

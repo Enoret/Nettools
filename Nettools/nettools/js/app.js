@@ -131,9 +131,7 @@ const Router = {
 
         // Show/hide auto-status indicator (only relevant on speed & network)
         const autoStatus = document.getElementById('autoStatusIndicator');
-        const autoSeparator = document.querySelector('.topbar-separator');
         if (autoStatus) autoStatus.style.display = (page === 'speed' || page === 'network') ? '' : 'none';
-        if (autoSeparator) autoSeparator.style.display = (page === 'speed' || page === 'network') ? '' : 'none';
 
         // Close mobile sidebar
         document.getElementById('sidebar').classList.remove('mobile-open');
@@ -167,6 +165,14 @@ const Sidebar = {
             localStorage.setItem('nettools-sidebar-collapsed', sidebar.classList.contains('collapsed'));
         });
 
+        // When the sidebar width animation ends, let the charts (ApexCharts)
+        // resize to the new space: they keep a fixed pixel width otherwise.
+        sidebar.addEventListener('transitionend', (e) => {
+            if (e.target === sidebar && e.propertyName === 'width') {
+                window.dispatchEvent(new Event('resize'));
+            }
+        });
+
         mobileBtn.addEventListener('click', () => {
             sidebar.classList.add('mobile-open');
             overlay.classList.add('visible');
@@ -177,6 +183,174 @@ const Sidebar = {
             overlay.classList.remove('visible');
         });
     }
+};
+
+// --- Notifications panel (bell in the top bar) ---
+// Same events that are sent by Telegram (new devices, scheduled speed tests,
+// port changes). Stored by the server as data and rendered here in the UI
+// language.
+const Notifications = {
+    items: [],
+    unread: 0,
+    _timer: null,
+
+    init() {
+        const btn = document.getElementById('notifBtn');
+        const panel = document.getElementById('notifPanel');
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const open = panel.classList.toggle('hidden') === false;
+            btn.classList.toggle('open', open);
+            if (open) this.load();
+        });
+        document.addEventListener('click', (e) => {
+            if (!panel.classList.contains('hidden') && !e.target.closest('.notif-wrap')) this.close();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') this.close();
+        });
+        document.getElementById('notifReadAll').addEventListener('click', () => this.markAllRead());
+        document.getElementById('notifList').addEventListener('click', (e) => {
+            const readBtn = e.target.closest('.notif-read-btn');
+            const item = e.target.closest('.notif-item');
+            if (!item) return;
+            const id = Number(item.dataset.id);
+            if (readBtn) {
+                e.stopPropagation();
+                this.markRead(id);
+                return;
+            }
+            // Open the related section (and mark it as read)
+            const n = this.items.find(x => x.id === id);
+            if (n && !n.read) this.markRead(id);
+            const page = { new_devices: 'network', port_changes: 'network', speed_test: 'speed', speed_test_failed: 'speed' }[n && n.type];
+            if (page) {
+                this.close();
+                Router.navigate(page);
+            }
+        });
+        this.load();
+        this._timer = setInterval(() => this.load(), 30000);
+    },
+
+    close() {
+        document.getElementById('notifPanel').classList.add('hidden');
+        document.getElementById('notifBtn').classList.remove('open');
+    },
+
+    async load() {
+        try {
+            const r = await API.notifications.list();
+            this.items = r.items || [];
+            this.unread = r.unread || 0;
+        } catch (e) {
+            return;
+        }
+        this.render();
+    },
+
+    async markRead(id) {
+        const n = this.items.find(x => x.id === id);
+        if (n && !n.read) {
+            n.read = true;
+            this.unread = Math.max(0, this.unread - 1);
+            this.render();
+        }
+        try { await API.notifications.read(id); } catch (e) { this.load(); }
+    },
+
+    async markAllRead() {
+        this.items.forEach(n => { n.read = true; });
+        this.unread = 0;
+        this.render();
+        try { await API.notifications.readAll(); } catch (e) { this.load(); }
+    },
+
+    esc(v) {
+        const d = document.createElement('div');
+        d.textContent = v == null ? '' : String(v);
+        return d.innerHTML;
+    },
+
+    timeAgo(ts) {
+        if (!ts) return '';
+        const d = new Date(ts.replace(' ', 'T'));
+        const mins = Math.round((Date.now() - d.getTime()) / 60000);
+        if (isNaN(mins)) return ts;
+        if (mins < 1) return I18N.t('ahora mismo');
+        if (mins < 60) return I18N.t('hace {n} min', { n: mins });
+        if (mins < 24 * 60) return I18N.t('hace {n} h', { n: Math.round(mins / 60) });
+        return d.toLocaleString(I18N.locale, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    },
+
+    describe(n) {
+        const d = n.data || {};
+        const esc = (v) => `<span translate="no">${this.esc(v)}</span>`;
+        const mbps = (v) => (v == null ? '-' : Number(v).toFixed(0));
+        switch (n.type) {
+            case 'new_devices': {
+                const list = d.devices || [];
+                const count = d.count || list.length;
+                const names = list.slice(0, 3).map(x =>
+                    esc(`${x.hostname || x.ip_address || '?'}${x.ip_address && x.hostname ? ' (' + x.ip_address + ')' : ''}${x.brand ? ' · ' + x.brand : ''}`));
+                return {
+                    icon: 'ri-radar-line',
+                    title: count === 1 ? I18N.t('Nuevo dispositivo detectado') : I18N.t('{n} nuevos dispositivos detectados', { n: count }),
+                    text: names.join('<br>') + (count > 3 ? '<br>' + I18N.t('y {n} mas', { n: count - 3 }) : ''),
+                };
+            }
+            case 'speed_test':
+                return {
+                    icon: d.slow ? 'ri-error-warning-line' : 'ri-speed-up-line',
+                    title: d.slow ? I18N.t('Velocidad por debajo de lo esperado') : I18N.t('Test de velocidad programado'),
+                    text: `↓ ${mbps(d.download)} Mbps · ↑ ${mbps(d.upload)} Mbps · ${d.ping != null ? Number(d.ping).toFixed(1) : '-'} ms` +
+                          (d.slow && d.threshold ? '<br>' + I18N.t('Umbral: {n} Mbps', { n: mbps(d.threshold) }) : ''),
+                };
+            case 'speed_test_failed':
+                return {
+                    icon: 'ri-close-circle-line',
+                    title: I18N.t('Test de velocidad fallido'),
+                    text: this.esc(I18N.t(d.error || '')),
+                };
+            case 'port_changes': {
+                const fmt = (ports, sign) => ports.map(p => `${sign}${p.port}${p.service ? ' ' + this.esc(p.service) : ''}`).join(', ');
+                const lines = (d.changes || []).slice(0, 4).map(c =>
+                    `${esc(c.name || c.ip)}: ${[fmt(c.new_ports || [], '+'), fmt(c.closed_ports || [], '−')].filter(Boolean).join(', ')}`);
+                return {
+                    icon: 'ri-door-open-line',
+                    title: I18N.t('Cambios en puertos abiertos'),
+                    text: lines.join('<br>') + ((d.changes || []).length > 4 ? '<br>' + I18N.t('y {n} mas', { n: d.changes.length - 4 }) : ''),
+                };
+            }
+            default:
+                return { icon: 'ri-notification-3-line', title: n.type, text: '' };
+        }
+    },
+
+    render() {
+        const badge = document.getElementById('notifBadge');
+        badge.textContent = this.unread > 99 ? '99+' : this.unread;
+        badge.classList.toggle('hidden', !this.unread);
+        document.getElementById('notifReadAll').disabled = !this.unread;
+        const list = document.getElementById('notifList');
+        if (!this.items.length) {
+            list.innerHTML = `<div class="notif-empty"><i class="ri-notification-off-line"></i>${I18N.t('No hay notificaciones')}</div>`;
+            return;
+        }
+        list.innerHTML = this.items.map(n => {
+            const v = this.describe(n);
+            return `
+                <div class="notif-item ${n.read ? '' : 'unread'}" data-id="${n.id}">
+                    <div class="notif-icon ${n.level || 'info'}"><i class="${v.icon}"></i></div>
+                    <div class="notif-body">
+                        <div class="notif-item-title">${v.title}</div>
+                        ${v.text ? `<div class="notif-item-text">${v.text}</div>` : ''}
+                        <div class="notif-time">${this.timeAgo(n.created_at)}</div>
+                    </div>
+                    ${n.read ? '<span></span>' : `<button class="notif-read-btn" title="${I18N.t('Marcar como leida')}"><i class="ri-check-line"></i></button>`}
+                </div>`;
+        }).join('');
+    },
 };
 
 // --- Toast Notifications ---
@@ -243,7 +417,7 @@ function closeConfirm() {
 const Utils = {
     formatDate(dateStr) {
         const d = new Date(dateStr);
-        return d.toLocaleDateString('es-ES', {
+        return d.toLocaleDateString(I18N.locale, {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric',
@@ -254,7 +428,7 @@ const Utils = {
 
     formatDateShort(dateStr) {
         const d = new Date(dateStr);
-        return d.toLocaleDateString('es-ES', {
+        return d.toLocaleDateString(I18N.locale, {
             day: '2-digit',
             month: 'short',
             hour: '2-digit',
@@ -313,7 +487,7 @@ const Utils = {
             gaming: 'Gaming',
             other: 'Dispositivo',
         };
-        return names[type] || 'Dispositivo';
+        return I18N.t(names[type] || 'Dispositivo');
     },
 
     /** Numeric sort key for an IPv4 address, or null if there is none. */
@@ -411,4 +585,8 @@ document.addEventListener('DOMContentLoaded', () => {
     Sidebar.init();
     Router.init();
     ConnectionStatus.startPolling();
+    Notifications.init();
+    // Language chosen in the settings (server) and the UI language for the
+    // texts generated by the server (Telegram, device hints)
+    API.settings.getAll().then(s => I18N.syncWithServer(s)).catch(() => {});
 });

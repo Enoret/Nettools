@@ -508,8 +508,8 @@ const NetworkPage = {
         const auto = device.description_auto === 1;
         const text = this.escapeHtml(device.description);
         return auto
-            ? `<${tag} class="device-description device-hint" title="${text}\n\nPista automatica segun fabricante, nombre y puertos. Editala para poner la tuya."><i class="ri-lightbulb-line"></i> ${text}</${tag}>`
-            : `<${tag} class="device-description">${text}</${tag}>`;
+            ? `<${tag} class="device-description device-hint" translate="no" title="${text}\n\nPista automatica segun fabricante, nombre y puertos. Editala para poner la tuya."><i class="ri-lightbulb-line"></i> ${text}</${tag}>`
+            : `<${tag} class="device-description" translate="no">${text}</${tag}>`;
     },
 
     renderCell(device, col, visibleIds) {
@@ -520,10 +520,10 @@ const NetworkPage = {
         const dash = '-';
         switch (col.id) {
             case 'name': {
-                const name = device.custom_name || device.hostname || 'Sin nombre';
+                const name = device.custom_name || device.hostname || I18N.t('Sin nombre');
                 return `
                 <div class="device-name-col col-name">
-                    <div class="device-name">${esc(name)}</div>
+                    <div class="device-name" translate="no">${esc(name)}</div>
                     ${device.description && !visibleIds.includes('description') ? this.renderDescription(device, 'div') : ''}
                     ${deviceType !== 'other' && !visibleIds.includes('type') ? `<span class="device-type-badge"><i class="${icon}"></i> ${typeName}</span>` : ''}
                     ${this.renderServiceIcons(device)}
@@ -537,22 +537,22 @@ const NetworkPage = {
                         : device.last_ip
                             ? `<span class="last-ip" title="Ultima IP conocida. Ahora la usa otro dispositivo o el equipo esta desconectado.">${esc(device.last_ip)}</span>`
                             : dash}
-                    ${device.network_name && !visibleIds.includes('network') ? `<div class="network-name-badge" title="Red / VLAN segun UniFi"><i class="ri-git-branch-line"></i> ${esc(device.network_name)}</div>` : ''}
+                    ${device.network_name && !visibleIds.includes('network') ? `<div class="network-name-badge" translate="no" title="Red / VLAN segun UniFi"><i class="ri-git-branch-line"></i> ${esc(device.network_name)}</div>` : ''}
                 </div>`;
             case 'mac':
                 return `<div class="device-detail-col col-mac">${device.mac_address || dash}${device.mac_private
                     ? '<span class="mac-private-badge" title="MAC privada / aleatoria: el equipo puede cambiarla. Si aparece duplicado, usa Editar &gt; Fusionar.">privada</span>'
                     : ''}</div>`;
             case 'brand':
-                return `<div class="device-detail-col brand-col col-brand">${device.brand ? esc(device.brand) : dash}</div>`;
+                return `<div class="device-detail-col brand-col col-brand" translate="no">${device.brand ? esc(device.brand) : dash}</div>`;
             case 'location':
-                return `<div class="device-detail-col location-col col-location">${device.location ? esc(device.location) : dash}</div>`;
+                return `<div class="device-detail-col location-col col-location" translate="no">${device.location ? esc(device.location) : dash}</div>`;
             case 'type':
                 return `<div class="device-detail-col location-col col-type">${deviceType !== 'other' ? `<i class="${icon}"></i> ${typeName}` : dash}</div>`;
             case 'network':
-                return `<div class="device-detail-col location-col col-network">${device.network_name ? esc(device.network_name) : dash}</div>`;
+                return `<div class="device-detail-col location-col col-network" translate="no">${device.network_name ? esc(device.network_name) : dash}</div>`;
             case 'hostname':
-                return `<div class="device-detail-col location-col col-hostname">${device.hostname ? esc(device.hostname) : dash}</div>`;
+                return `<div class="device-detail-col location-col col-hostname" translate="no">${device.hostname ? esc(device.hostname) : dash}</div>`;
             case 'description':
                 return `<div class="device-detail-col location-col col-description" title="${esc(device.description || '')}">${device.description ? this.renderDescription(device, 'span') : dash}</div>`;
             case 'ports':
@@ -798,10 +798,10 @@ const NetworkPage = {
     //  MERGE DEVICES
     // ==========================================
     deviceLabel(d) {
-        const name = d.custom_name || d.hostname || 'Sin nombre';
-        const ip = d.ip_address || (d.last_ip ? `${d.last_ip} (antes)` : 'sin IP');
+        const name = d.custom_name || d.hostname || I18N.t('Sin nombre');
+        const ip = d.ip_address || (d.last_ip ? I18N.t('{ip} (antes)', { ip: d.last_ip }) : I18N.t('sin IP'));
         const brand = d.brand ? ` · ${d.brand}` : '';
-        return `${name} — ${ip} — ${d.mac_address || 'sin MAC'}${brand}`;
+        return `${name} — ${ip} — ${d.mac_address || I18N.t('sin MAC')}${brand}`;
     },
 
     openMergeModal(device) {
@@ -856,8 +856,10 @@ const NetworkPage = {
 
         showConfirm(
             'Fusionar dispositivos',
-            `Se conservara "${target.custom_name || target.hostname || target.ip_address || target.mac_address}" ` +
-            `con la MAC ${source.mac_address || '-'} y se eliminara el otro registro. ¿Continuar?`,
+            I18N.t('Se conservara "{name}" con la MAC {mac} y se eliminara el otro registro. ¿Continuar?', {
+                name: target.custom_name || target.hostname || target.ip_address || target.mac_address,
+                mac: source.mac_address || '-',
+            }),
             async () => {
                 try {
                     await API.devices.merge(targetId, sourceId);
@@ -1103,10 +1105,11 @@ const NetworkPage = {
             if (!sel.length) return;
             const saved = sel.filter(d => d.status !== 'new').length;
             const names = sel.slice(0, 5).map(d => d.custom_name || d.hostname || d.ip_address || d.last_ip || d.mac_address).join(', ');
-            const msg = `¿Seguro que quieres eliminar ${sel.length} dispositivo${sel.length > 1 ? 's' : ''}?\n\n` +
-                `${names}${sel.length > 5 ? ` y ${sel.length - 5} mas` : ''}` +
-                (saved ? `\n\nAtencion: ${saved} ${saved > 1 ? 'estan guardados o son manuales' : 'esta guardado o es manual'}. ` +
-                         'Su ficha se conserva en el Inventario.' : '');
+            const msg = I18N.t(sel.length > 1 ? '¿Seguro que quieres eliminar {n} dispositivos?' : '¿Seguro que quieres eliminar {n} dispositivo?', { n: sel.length }) +
+                `\n\n${names}` + (sel.length > 5 ? I18N.t(' y {n} mas', { n: sel.length - 5 }) : '') +
+                (saved ? '\n\n' + I18N.t(saved > 1
+                    ? 'Atencion: {n} estan guardados o son manuales. Su ficha se conserva en el Inventario.'
+                    : 'Atencion: {n} esta guardado o es manual. Su ficha se conserva en el Inventario.', { n: saved }) : '');
             showConfirm('Eliminar dispositivos', msg, () =>
                 this.bulkApply({ action: 'delete' }, r => `${r.deleted} dispositivo${r.deleted === 1 ? '' : 's'} eliminado${r.deleted === 1 ? '' : 's'}`));
         });

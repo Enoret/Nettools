@@ -302,6 +302,8 @@ const SettingsPage = {
         if (settings.timezone !== undefined) {
             document.getElementById('timezoneSelect').value = settings.timezone;
         }
+        // Language
+        document.getElementById('languageSelect').value = settings.language || 'auto';
     },
 
     async saveSettings() {
@@ -322,6 +324,7 @@ const SettingsPage = {
             telegram_bot_token: document.getElementById('telegramBotToken').value.trim(),
             telegram_chat_id: document.getElementById('telegramChatId').value.trim(),
             timezone: document.getElementById('timezoneSelect').value,
+            language: document.getElementById('languageSelect').value,
             auto_port_scan: document.getElementById('autoPortScan').checked,
             port_scan_hour: document.getElementById('portScanHour').value,
             port_scan_profile: document.getElementById('portScanProfile').value,
@@ -331,8 +334,10 @@ const SettingsPage = {
         };
 
         try {
-            await API.settings.update(settings);
+            const saved = await API.settings.update(settings);
             Toast.success('Configuracion guardada');
+            // Reloads the page if the language changed
+            if (saved) setTimeout(() => I18N.syncWithServer(saved), 600);
             return true;
         } catch (err) {
             Toast.error(`No se pudo guardar la configuracion: ${err.message}`);
@@ -368,8 +373,8 @@ const SettingsPage = {
                 <span class="range-cidr mono">${esc(r.cidr)}</span>
                 <span class="range-method">
                     ${r.method === 'arp'
-                        ? `<span class="range-badge arp">ARP</span>interfaz ${esc(r.interface)} · con MAC`
-                        : '<span class="range-badge routed">Ping</span>red enrutada · sin MAC (por IP)'}
+                        ? `<span class="range-badge arp">ARP</span>${I18N.t('interfaz {iface} · con MAC', { iface: esc(r.interface) })}`
+                        : `<span class="range-badge routed">Ping</span>${I18N.t('red enrutada · sin MAC (por IP)')}`}
                 </span>
                 <button class="device-action-btn delete" data-remove-range="${esc(r.cidr)}" title="Quitar">
                     <i class="ri-delete-bin-line"></i>
@@ -501,15 +506,15 @@ const SettingsPage = {
         btn.disabled = !!st.running;
         if (st.running) {
             out.textContent = st.total
-                ? `Escaneando ${st.done}/${st.total}${st.current ? ': ' + st.current : ''}...`
-                : 'Iniciando escaneo...';
+                ? I18N.t('Escaneando {done}/{total}...', { done: st.done, total: st.total }).replace(/\.\.\.$/, (st.current ? ': ' + st.current : '') + '...')
+                : I18N.t('Iniciando escaneo...');
             this._bulkPollTimer = setTimeout(() => this.pollBulkPortScan(), 3000);
             this._bulkWasRunning = true;
         } else if (st.summary) {
             const s = st.summary;
-            out.textContent = `Ultimo escaneo (${st.finished_at}): ${s.devices} dispositivos, ` +
-                `${s.open_ports} puertos abiertos, ${s.changed_devices} con cambios` +
-                (s.errors ? `, ${s.errors} errores` : '');
+            out.textContent = I18N.t('Ultimo escaneo ({date}): {devices} dispositivos, {ports} puertos abiertos, {changed} con cambios', {
+                date: st.finished_at, devices: s.devices, ports: s.open_ports, changed: s.changed_devices,
+            }) + (s.errors ? I18N.t(', {n} errores', { n: s.errors }) : '');
             if (this._bulkWasRunning) {
                 this._bulkWasRunning = false;
                 Toast.success('Escaneo de puertos completado');
@@ -549,7 +554,7 @@ const SettingsPage = {
             const nets = Object.entries(r.networks || {})
                 .sort((a, b) => b[1] - a[1])
                 .map(([n, c]) => `${n}: ${c}`).join(', ');
-            out.textContent = `OK: ${r.clients} clientes conectados${nets ? ' (' + nets + ')' : ''}`;
+            out.textContent = I18N.t('OK: {n} clientes conectados', { n: r.clients }) + (nets ? ' (' + nets + ')' : '');
             out.classList.add('text-success');
             Toast.success('Conexion con UniFi correcta. Guarda la configuracion para usarla en los escaneos.');
         } catch (err) {

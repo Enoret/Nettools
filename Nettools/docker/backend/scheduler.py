@@ -124,18 +124,37 @@ def _merge_unifi(settings: dict, devices: list):
         return {'error': str(e)}
 
 
+def _telegram_target(settings: dict):
+    """(bot_token, chat_id) if Telegram is enabled and configured, else None."""
+    if not settings.get('telegram_enabled'):
+        return None
+    token, chat = settings.get('telegram_bot_token', ''), settings.get('telegram_chat_id', '')
+    return (token, chat) if token and chat else None
+
+
+def _panel(type_: str, data: dict, level: str = 'info'):
+    """Store a notification for the bell panel (never breaks the caller)."""
+    try:
+        db.add_notification(type_, data, level)
+    except Exception as e:
+        logger.error(f"Could not store notification: {e}")
+
+
 def _notify_new_devices(settings: dict, new_devices: list):
-    if not new_devices or send_new_device_alert is None:
-        return
-    if not settings.get('telegram_enabled', False):
+    if not new_devices:
         return
     if not settings.get('notify_new_devices', True):
+        return
+    _panel('new_devices', {'devices': [
+        {k: d.get(k) for k in ('hostname', 'ip_address', 'mac_address', 'brand', 'device_type')}
+        for d in new_devices[:50]], 'count': len(new_devices)})
+    if send_new_device_alert is None or not _telegram_target(settings):
         return
     bot_token = settings.get('telegram_bot_token', '')
     chat_id = settings.get('telegram_chat_id', '')
     if bot_token and chat_id:
         try:
-            send_new_device_alert(bot_token, chat_id, new_devices)
+            send_new_device_alert(bot_token, chat_id, new_devices, db.server_language(settings))
         except Exception as e:
             logger.error(f"Telegram notification failed: {e}")
 
@@ -242,15 +261,21 @@ def perform_bulk_port_scan(profile: str = None, scope: str = None) -> dict:
 
 
 def _notify_port_changes(changes: list):
-    if not changes or send_port_changes_alert is None:
+    if not changes:
         return
     settings = db.get_settings()
-    if not (settings.get('telegram_enabled') and settings.get('notify_new_ports', True)):
+    if not settings.get('notify_new_ports', True):
         return
-    token, chat = settings.get('telegram_bot_token', ''), settings.get('telegram_chat_id', '')
-    if token and chat:
+    _panel('port_changes', {'changes': [
+        {'name': c['name'], 'ip': c['ip'],
+         'new_ports': [{'port': p['port'], 'service': p.get('service') or ''} for p in c['new_ports']],
+         'closed_ports': [{'port': p['port'], 'service': p.get('service') or ''} for p in c['closed_ports']]}
+        for c in changes]}, 'warning')
+    target = _telegram_target(settings)
+    if send_port_changes_alert is not None and target:
+        token, chat = target
         try:
-            send_port_changes_alert(token, chat, changes)
+            send_port_changes_alert(token, chat, changes, db.server_language(settings))
         except Exception as e:
             logger.error(f"Port changes Telegram notification failed: {e}")
 
@@ -279,20 +304,9 @@ def is_test_in_progress() -> bool:
 #  Scheduled jobs
 # ==========================================
 
-def _speed_test_telegram_target(settings: dict):
-    """(bot_token, chat_id) if scheduled speed test notifications are on, else None."""
-    if send_speed_test_result is None:
-        return None
-    if not (settings.get('telegram_enabled') and settings.get('notify_speed_tests')):
-        return None
-    token, chat = settings.get('telegram_bot_token', ''), settings.get('telegram_chat_id', '')
-    return (token, chat) if token and chat else None
-
-
 def _notify_speed_test(result: dict):
     settings = db.get_settings()
-    target = _speed_test_telegram_target(settings)
-    if not target:
+    if not settings.get('notify_speed_tests'):
         return
     try:
         threshold = float(settings.get('speed_test_alert_threshold', 0) or 0)
@@ -301,9 +315,17 @@ def _notify_speed_test(result: dict):
     dl, ul = result.get('download_speed') or 0, result.get('upload_speed') or 0
     if threshold and dl >= threshold and ul >= threshold:
         return  # only notify when below the threshold
+    slow = bool(threshold and (dl < threshold or ul < threshold))
+    _panel('speed_test', {'download': dl, 'upload': ul, 'ping': result.get('ping'),
+                          'jitter': result.get('jitter'), 'threshold': threshold, 'slow': slow,
+                          'server': result.get('server_location') or result.get('server_name')},
+           'warning' if slow else 'info')
+    target = _telegram_target(settings)
+    if send_speed_test_result is None or not target:
+        return
     try:
         averages = db.get_speed_test_averages(7, exclude_id=result.get('id'))
-        send_speed_test_result(*target, result, averages, threshold)
+        send_speed_test_result(*target, result, averages, threshold, db.server_language(settings))
     except Exception as e:
         logger.error(f"Speed test Telegram notification failed: {e}")
 
@@ -318,10 +340,14 @@ def scheduled_speed_test():
         return
     except Exception as e:
         logger.error(f"Scheduled speed test failed: {e}")
-        target = _speed_test_telegram_target(db.get_settings())
-        if target:
+        settings = db.get_settings()
+        if not settings.get('notify_speed_tests'):
+            return
+        _panel('speed_test_failed', {'error': str(e)[:300]}, 'error')
+        target = _telegram_target(settings)
+        if target and send_speed_test_failure is not None:
             try:
-                send_speed_test_failure(*target, e)
+                send_speed_test_failure(*target, e, db.server_language())
             except Exception as te:
                 logger.error(f"Speed test failure notification failed: {te}")
         return

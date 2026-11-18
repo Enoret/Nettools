@@ -155,7 +155,7 @@ const NetCheckPage = {
             <div class="ping-status-dot ${reachable ? 'reachable' : 'unreachable'}"></div>
             <div class="ping-result-info">
                 <div class="ping-result-ip">${this.escapeHtml(result.ip)}</div>
-                <div class="ping-result-name">${this.escapeHtml(result.error ? `Error: ${result.error}` : (result.name || (reachable ? 'Alcanzable' : 'No responde')))}</div>
+                <div class="ping-result-name"${result.name && !result.error ? ' translate="no"' : ''}>${this.escapeHtml(result.error ? `Error: ${result.error}` : (result.name || I18N.t(reachable ? 'Alcanzable' : 'No responde')))}</div>
             </div>
             <div class="ping-result-latency ${reachable ? latencyClass : 'bad'}">
                 ${reachable ? (latency != null ? `${latency.toFixed(1)} ms` : 'OK') : (result.error ? 'Error' : 'Timeout')}

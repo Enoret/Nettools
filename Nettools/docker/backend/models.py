@@ -124,6 +124,8 @@ class SettingsUpdate(BaseModel):
     port_scan_profile: Optional[str] = None
     port_scan_scope: Optional[str] = None
     notify_new_ports: Optional[bool] = None
+    language: Optional[str] = None       # auto | es | en
+    ui_language: Optional[str] = None    # reported by the UI
     view_netalert: Optional[str] = None    # JSON: {columns: [...], sort: {field, dir}}
     view_inventory: Optional[str] = None
     unifi_enabled: Optional[bool] = None
