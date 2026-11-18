@@ -59,6 +59,14 @@ class DeviceUpdate(BaseModel):
     status: Optional[str] = None
 
 
+class DeviceBulk(BaseModel):
+    ids: List[int]
+    action: str                      # 'delete' | 'update'
+    status: Optional[str] = None     # 'saved' (only 'new' devices change) | 'new'
+    device_type: Optional[str] = None
+    location: Optional[str] = None
+
+
 class Device(BaseModel):
     id: int
     ip_address: Optional[str] = None
@@ -99,12 +107,54 @@ class SettingsUpdate(BaseModel):
     speed_test_retention: Optional[str] = None
     auto_network_scan: Optional[bool] = None
     network_scan_frequency: Optional[str] = None
-    network_range: Optional[str] = None
+    network_range: Optional[str] = None  # legacy
+    scan_local_networks: Optional[bool] = None
+    network_ranges: Optional[str] = None
     notify_new_devices: Optional[bool] = None
     telegram_enabled: Optional[bool] = None
     telegram_bot_token: Optional[str] = None
     telegram_chat_id: Optional[str] = None
     timezone: Optional[str] = None
+    notify_speed_tests: Optional[bool] = None
+    speed_test_alert_threshold: Optional[str] = None
+    purge_stale_devices: Optional[bool] = None
+    stale_device_days: Optional[str] = None
+    auto_port_scan: Optional[bool] = None
+    port_scan_hour: Optional[str] = None
+    port_scan_profile: Optional[str] = None
+    port_scan_scope: Optional[str] = None
+    notify_new_ports: Optional[bool] = None
+    view_netalert: Optional[str] = None    # JSON: {columns: [...], sort: {field, dir}}
+    view_inventory: Optional[str] = None
+    unifi_enabled: Optional[bool] = None
+    unifi_url: Optional[str] = None
+    unifi_auth: Optional[str] = None
+    unifi_api_key: Optional[str] = None
+    unifi_username: Optional[str] = None
+    unifi_password: Optional[str] = None
+    unifi_site: Optional[str] = None
+    unifi_verify_ssl: Optional[bool] = None
+
+
+# --- Inventory ---
+class InventoryItem(BaseModel):
+    name: Optional[str] = None
+    device_type: Optional[str] = None
+    brand: Optional[str] = None
+    location: Optional[str] = None
+    description: Optional[str] = None
+    model: Optional[str] = None
+    serial_number: Optional[str] = None
+    purchase_date: Optional[str] = None
+    purchase_price: Optional[float] = None
+    warranty_until: Optional[str] = None
+    supplier: Optional[str] = None
+    notes: Optional[str] = None
+    asset_status: Optional[str] = None
+    asset_kind: Optional[str] = None
+    host: Optional[str] = None
+    mac_address: Optional[str] = None
+    ip_address: Optional[str] = None
 
 
 # --- Scan ---

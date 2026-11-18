@@ -3,9 +3,11 @@ NetTools - FastAPI Backend
 Main application entry point
 """
 
+import json
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional, List
 from pydantic import BaseModel
@@ -13,15 +15,25 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 import database as db
+from oui_service import resolve_vendor, normalize_mac
 from models import (
     DeviceCreate, DeviceUpdate, PingRequest, PingBatchRequest,
-    PingResult, SettingsUpdate, ScanResult
+    PingResult, SettingsUpdate, ScanResult, InventoryItem, DeviceBulk
 )
-from speedtest_service import run_speed_test, get_servers
-from network_service import scan_network, ping_host
+from speedtest_service import get_servers
+from network_service import ping_host, get_local_networks, get_default_gateway, resolve_ranges, describe_range, parse_cidr, parse_range_list
 from traceroute_service import run_traceroute
+import unifi_service
+import logo_service
+import hint_service
 from nslookup_service import run_nslookup, reverse_lookup
-from scheduler import start_scheduler, stop_scheduler, update_schedule, is_scan_in_progress, is_test_in_progress
+from scheduler import (
+    start_scheduler, stop_scheduler, update_schedule,
+    is_scan_in_progress, is_test_in_progress,
+    perform_speed_test, perform_network_scan, TaskBusyError,
+    perform_port_scan, is_port_scan_in_progress,
+    start_bulk_port_scan_now, bulk_port_scan_status,
+)
 
 try:
     from telegram_service import test_connection as telegram_test_connection
@@ -36,7 +48,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Thread pool for blocking operations
-executor = ThreadPoolExecutor(max_workers=4)
+executor = ThreadPoolExecutor(max_workers=8)
 
 
 @asynccontextmanager
@@ -44,6 +56,15 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
     logger.info("Starting NetTools Backend...")
     db.init_db()
+    try:
+        filled = db.backfill_vendors(lambda mac: resolve_vendor(mac))
+        released = db.fix_ip_conflicts()
+        hints = db.refresh_hints(hint_service.guess)
+        if filled or released or hints:
+            logger.info(f"Startup maintenance: {filled} vendors updated, {released} stale IPs released, "
+                        f"{hints} device hints updated")
+    except Exception as e:
+        logger.error(f"Startup maintenance failed: {e}")
     start_scheduler()
     yield
     stop_scheduler()
@@ -53,7 +74,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="NetTools API",
     description="API para monitoreo de red y tests de velocidad",
-    version="1.0.0",
+    version="1.1.3",
     lifespan=lifespan,
 )
 
@@ -89,10 +110,9 @@ async def run_speedtest(data: SpeedTestRunRequest = SpeedTestRunRequest()):
 
     loop = asyncio.get_event_loop()
     try:
-        server_id = data.server_id
-        result = await loop.run_in_executor(executor, run_speed_test, server_id)
-        saved = db.save_speed_test(result)
-        return saved
+        return await loop.run_in_executor(executor, perform_speed_test, data.server_id)
+    except TaskBusyError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -168,6 +188,17 @@ async def get_devices(
     return db.get_devices(status_filter=status)
 
 
+@app.get("/api/devices/history")
+async def get_device_history(
+    range: str = Query('24h', description="Time range: 1h, 6h, 24h, 7d, 30d, 90d, 365d, all"),
+    limit: int = Query(500, ge=1, le=10000),
+):
+    """Get device count history (snapshots over time)."""
+    return db.get_device_snapshots(range_filter=range, limit=limit)
+
+
+# NOTE: routes with fixed paths (/history, /scan/...) must be declared
+# before /{device_id}, otherwise FastAPI matches them as a device id.
 @app.get("/api/devices/{device_id}")
 async def get_device(device_id: int):
     """Get a specific device."""
@@ -177,10 +208,75 @@ async def get_device(device_id: int):
     return device
 
 
+class PortScanRequest(BaseModel):
+    profile: Optional[str] = 'quick'
+
+
+@app.get("/api/devices/{device_id}/ports")
+async def get_device_ports(device_id: int):
+    """Get the known open ports of a device."""
+    device = db.get_device(device_id)
+    if not device:
+        raise HTTPException(status_code=404, detail="Dispositivo no encontrado")
+    return {
+        'device_id': device_id,
+        'last_port_scan': device.get('last_port_scan'),
+        'in_progress': is_port_scan_in_progress(device_id),
+        'ports': db.get_device_ports(device_id),
+    }
+
+
+@app.post("/api/ports/scan-all")
+async def scan_all_ports():
+    """Start a port scan of every online device in the background."""
+    try:
+        start_bulk_port_scan_now()
+    except TaskBusyError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return {'started': True}
+
+
+@app.get("/api/ports/scan-all/status")
+async def scan_all_ports_status():
+    return bulk_port_scan_status()
+
+
+@app.post("/api/devices/{device_id}/ports/scan")
+async def scan_device_ports(device_id: int, data: PortScanRequest = PortScanRequest()):
+    """Scan the TCP ports of a device (profile: quick | full)."""
+    loop = asyncio.get_event_loop()
+    try:
+        return await loop.run_in_executor(
+            executor, perform_port_scan, device_id, data.profile or 'quick'
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except TaskBusyError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/devices")
 async def create_device(data: DeviceCreate):
     """Create a new device manually."""
-    return db.create_device(data.model_dump(exclude_none=True))
+    payload = data.model_dump(exclude_none=True)
+    _normalize_mac_field(payload)
+    if payload.get('mac_address') and not payload.get('brand'):
+        payload['brand'] = resolve_vendor(payload['mac_address'])
+    return db.create_device(payload)
+
+
+def _normalize_mac_field(payload: dict):
+    """Store MACs as AA:BB:CC:DD:EE:FF so scans can match manual entries."""
+    mac = payload.get('mac_address')
+    if mac:
+        normalized = normalize_mac(mac)
+        if not normalized:
+            raise HTTPException(status_code=400, detail=f"MAC no valida: {mac}")
+        payload['mac_address'] = normalized
 
 
 @app.put("/api/devices/{device_id}")
@@ -191,6 +287,7 @@ async def update_device(device_id: int, data: DeviceUpdate):
         raise HTTPException(status_code=404, detail="Dispositivo no encontrado")
 
     update_data = data.model_dump(exclude_none=True)
+    _normalize_mac_field(update_data)
     # When user edits a 'new' device, mark it as 'saved'
     if existing['status'] == 'new' and 'status' not in update_data:
         update_data['status'] = 'saved'
@@ -198,9 +295,52 @@ async def update_device(device_id: int, data: DeviceUpdate):
     return db.update_device(device_id, update_data)
 
 
+class MergeRequest(BaseModel):
+    source_id: int
+
+
+@app.post("/api/devices/{device_id}/merge")
+async def merge_device(device_id: int, data: MergeRequest):
+    """Merge device `source_id` into `device_id` (the target keeps its name and
+    details and adopts the source's MAC/IP; the source is deleted)."""
+    try:
+        return db.merge_devices(device_id, data.source_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+DEVICE_TYPES = {'other', 'router', 'switch', 'ap', 'server', 'desktop', 'laptop', 'phone', 'tablet',
+                'printer', 'camera', 'iot', 'nas', 'tv', 'gaming'}
+
+
+@app.post("/api/devices/bulk")
+async def bulk_devices(data: DeviceBulk):
+    """Delete or update several devices at once."""
+    ids = sorted({int(i) for i in data.ids})
+    if not ids:
+        raise HTTPException(status_code=400, detail="No hay dispositivos seleccionados")
+    if len(ids) > 1000:
+        raise HTTPException(status_code=400, detail="Demasiados dispositivos")
+    if data.action == 'delete':
+        db.sync_inventory()  # saved devices keep their inventory sheet
+        return {"deleted": db.bulk_delete_devices(ids)}
+    if data.action == 'update':
+        if data.status not in (None, 'saved', 'new'):
+            raise HTTPException(status_code=400, detail="Estado no valido")
+        if data.device_type is not None and data.device_type not in DEVICE_TYPES:
+            raise HTTPException(status_code=400, detail="Tipo no valido")
+        location = data.location.strip() if data.location is not None else None
+        updated = db.bulk_update_devices(ids, data.status, data.device_type, location)
+        return {"updated": updated}
+    raise HTTPException(status_code=400, detail="Accion no valida")
+
+
 @app.delete("/api/devices/{device_id}")
 async def delete_device(device_id: int):
-    """Delete a device."""
+    """Delete a device (a saved device keeps its inventory sheet)."""
+    db.sync_inventory()
     db.delete_device(device_id)
     return {"status": "deleted"}
 
@@ -218,45 +358,11 @@ async def scan_devices():
     if is_scan_in_progress():
         raise HTTPException(status_code=409, detail="Ya hay un escaneo en curso")
 
-    settings = db.get_settings()
-    network_range = settings.get('network_range', '192.168.1.0/24')
-
     loop = asyncio.get_event_loop()
-
-    def do_scan():
-        db.mark_all_offline()
-        devices = scan_network(network_range)
-        new_count = 0
-        updated_count = 0
-
-        for device_data in devices:
-            existing = None
-            if device_data.get('mac_address'):
-                conn = db.get_db()
-                existing = conn.execute(
-                    "SELECT id FROM devices WHERE mac_address = ?",
-                    (device_data['mac_address'],)
-                ).fetchone()
-                conn.close()
-
-            result = db.upsert_device_by_mac(device_data)
-            if existing:
-                updated_count += 1
-            else:
-                new_count += 1
-
-        # Save historical snapshot
-        db.save_device_snapshot()
-
-        return {
-            'found': len(devices),
-            'new_devices': new_count,
-            'updated_devices': updated_count,
-        }
-
     try:
-        result = await loop.run_in_executor(executor, do_scan)
-        return result
+        return await loop.run_in_executor(executor, perform_network_scan)
+    except TaskBusyError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -267,13 +373,28 @@ async def scan_status():
     return {"in_progress": is_scan_in_progress()}
 
 
-@app.get("/api/devices/history")
-async def get_device_history(
-    range: str = Query('24h', description="Time range: 1h, 6h, 24h, 7d, 30d, 90d, 365d, all"),
-    limit: int = Query(500, ge=1, le=10000),
-):
-    """Get device count history (snapshots over time)."""
-    return db.get_device_snapshots(range_filter=range, limit=limit)
+# ==========================================
+#  NETWORK RANGES
+# ==========================================
+
+@app.get("/api/network/info")
+async def network_info():
+    """Local networks of the server and the ranges the scan will cover."""
+    settings = db.get_settings()
+    return {
+        'local_networks': get_local_networks(),
+        'gateway': get_default_gateway(),
+        'ranges': resolve_ranges(settings),
+    }
+
+
+@app.get("/api/network/check")
+async def network_check(cidr: str = Query(..., description="IPv4 range, e.g. 192.168.20.0/24")):
+    """Validate a range and tell how it would be scanned (arp / routed)."""
+    try:
+        return describe_range(parse_cidr(cidr))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ==========================================
@@ -409,6 +530,29 @@ async def get_settings():
 async def update_settings(data: SettingsUpdate):
     """Update settings."""
     settings_data = data.model_dump(exclude_none=True)
+    if 'network_ranges' in settings_data:
+        try:
+            settings_data['network_ranges'] = ','.join(parse_range_list(settings_data['network_ranges']))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    if settings_data.get('unifi_url'):
+        try:
+            settings_data['unifi_url'] = unifi_service._base_url(settings_data['unifi_url'])
+        except unifi_service.UnifiError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    for key in ('view_netalert', 'view_inventory'):
+        if key in settings_data:
+            try:
+                cfg = json.loads(settings_data[key])
+                assert isinstance(cfg, dict) and isinstance(cfg.get('columns'), list) and len(settings_data[key]) < 4000
+            except Exception:
+                raise HTTPException(status_code=400, detail="Configuracion de columnas no valida")
+    if settings_data.get('port_scan_profile') not in (None, 'quick', 'full'):
+        raise HTTPException(status_code=400, detail="Perfil de escaneo no valido")
+    if settings_data.get('port_scan_scope') not in (None, 'online', 'saved'):
+        raise HTTPException(status_code=400, detail="Alcance de escaneo no valido")
+    if settings_data.get('unifi_auth') not in (None, 'api_key', 'login'):
+        raise HTTPException(status_code=400, detail="unifi_auth debe ser 'api_key' o 'login'")
     db.update_settings(settings_data)
 
     # Update scheduler with new settings
@@ -437,6 +581,119 @@ async def test_telegram():
         return result
     else:
         raise HTTPException(status_code=400, detail=result['message'])
+
+
+@app.post("/api/settings/unifi/test")
+async def test_unifi(data: SettingsUpdate = None):
+    """Test the UniFi connection with the saved settings, overridden by the
+    (possibly unsaved) values sent in the body."""
+    settings = db.get_settings()
+    if data is not None:
+        settings.update({k: v for k, v in data.model_dump(exclude_none=True).items() if k.startswith('unifi_')})
+    loop = asyncio.get_event_loop()
+    try:
+        return await loop.run_in_executor(executor, unifi_service.test_connection, settings)
+    except unifi_service.UnifiError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception("UniFi test failed")
+        raise HTTPException(status_code=500, detail=f"Error inesperado: {e}")
+
+
+# ==========================================
+#  INVENTORY
+# ==========================================
+
+def _validate_inventory(payload: dict):
+    import re
+    for k in ('purchase_date', 'warranty_until'):
+        v = payload.get(k)
+        if v and not re.fullmatch(r'\d{4}-\d{2}-\d{2}', v):
+            raise HTTPException(status_code=400, detail=f"Fecha no valida ({k}): usa AAAA-MM-DD")
+    if payload.get('asset_kind') not in (None, 'physical', 'vm', 'lxc', 'docker'):
+        raise HTTPException(status_code=400, detail="Tipo de activo no valido")
+    if payload.get('asset_status') not in (None, 'active', 'retired'):
+        raise HTTPException(status_code=400, detail="Estado no valido")
+    if payload.get('purchase_price') is not None and payload['purchase_price'] < 0:
+        raise HTTPException(status_code=400, detail="El precio no puede ser negativo")
+    _normalize_mac_field(payload)
+
+
+@app.get("/api/inventory")
+async def list_inventory():
+    """Inventory: saved/manual devices from Net Alert plus items added here."""
+    return db.get_inventory()
+
+
+@app.post("/api/inventory")
+async def create_inventory_item(data: InventoryItem):
+    payload = data.model_dump(exclude_none=True)
+    if not (payload.get('name') or '').strip():
+        raise HTTPException(status_code=400, detail="El nombre es obligatorio")
+    _validate_inventory(payload)
+    return db.create_inventory_item(payload)
+
+
+@app.put("/api/inventory/{item_id}")
+async def update_inventory_item(item_id: int, data: InventoryItem):
+    payload = data.model_dump(exclude_unset=True)
+    _validate_inventory({k: v for k, v in payload.items() if v is not None})
+    if payload.get('mac_address'):
+        payload['mac_address'] = normalize_mac(payload['mac_address'])
+    try:
+        item = db.update_inventory_item(item_id, payload)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return item
+
+
+@app.delete("/api/inventory/{item_id}")
+async def delete_inventory_item(item_id: int):
+    if not db.delete_inventory_item(item_id):
+        raise HTTPException(status_code=404, detail="Elemento de inventario no encontrado")
+    return {"deleted": True}
+
+
+# ==========================================
+#  MANUFACTURER LOGOS
+# ==========================================
+
+class LogoUpload(BaseModel):
+    brand: str
+    data_url: str
+
+
+@app.get("/api/logos")
+def get_logo(brand: str = Query(...)):
+    """Logo of a manufacturer (uploaded, Simple Icons or website icon)."""
+    path = logo_service.get_logo(brand)
+    if not path:
+        raise HTTPException(status_code=404, detail="Sin logo")
+    return FileResponse(path, media_type=logo_service.content_type(path), headers={
+        'Cache-Control': 'public, max-age=86400',
+        # SVGs are only displayed as images: never let them run anything
+        'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'",
+        'X-Content-Type-Options': 'nosniff',
+    })
+
+
+@app.get("/api/logos/info")
+def logo_info(brand: str = Query(...)):
+    return {'key': logo_service.brand_key(brand), 'custom': logo_service.has_custom_logo(brand)}
+
+
+@app.post("/api/logos")
+def upload_logo(data: LogoUpload):
+    try:
+        key = logo_service.save_custom_logo(data.brand, data.data_url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {'key': key, 'custom': True}
+
+
+@app.delete("/api/logos")
+def delete_logo(brand: str = Query(...)):
+    return {'deleted': logo_service.delete_custom_logo(brand)}
 
 
 # ==========================================

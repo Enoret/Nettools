@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/remixicon@4.1.0/fonts/remixicon.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=__BUILD__">
 </head>
 <body>
     <!-- Sidebar -->
@@ -40,6 +40,12 @@
                     </a>
                 </li>
                 <li>
+                    <a href="#" class="nav-link" data-page="inventory">
+                        <i class="ri-archive-drawer-line"></i>
+                        <span>Inventario</span>
+                    </a>
+                </li>
+                <li>
                     <a href="#" class="nav-link" data-page="netcheck">
                         <i class="ri-shield-check-line"></i>
                         <span>Net Check</span>
@@ -67,8 +73,8 @@
                     <i class="ri-moon-line"></i>
                 </button>
             </div>
-            <div class="sidebar-version">v1.0.0</div>
-            <div class="sidebar-credit"><a href="https://bytebeat.es" target="_blank">bytebeat.es</a></div>
+            <div class="sidebar-version">v1.1.3</div>
+            <div class="sidebar-credit"><a href="https://braut.es" target="_blank">braut.es</a></div>
         </div>
     </aside>
 
@@ -437,7 +443,7 @@
 
             <!-- Network Stats -->
             <div class="stats-row">
-                <div class="stat-card">
+                <div class="stat-card stat-filter" data-filter="all" role="button" tabindex="0" title="Ver todos">
                     <div class="stat-icon devices">
                         <i class="ri-device-line"></i>
                     </div>
@@ -446,7 +452,7 @@
                         <span class="stat-value" id="totalDevices">0</span>
                     </div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card stat-filter" data-filter="online" role="button" tabindex="0" title="Ver solo los conectados">
                     <div class="stat-icon online">
                         <i class="ri-wifi-line"></i>
                     </div>
@@ -455,7 +461,7 @@
                         <span class="stat-value" id="onlineDevices">0</span>
                     </div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card stat-filter" data-filter="offline" role="button" tabindex="0" title="Ver solo los desconectados">
                     <div class="stat-icon offline">
                         <i class="ri-wifi-off-line"></i>
                     </div>
@@ -464,7 +470,7 @@
                         <span class="stat-value" id="offlineDevices">0</span>
                     </div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card stat-filter" data-filter="new" role="button" tabindex="0" title="Ver solo los nuevos">
                     <div class="stat-icon new-device">
                         <i class="ri-alarm-warning-line"></i>
                     </div>
@@ -493,6 +499,9 @@
                         </div>
                     </div>
                     <div class="toolbar-right">
+                        <button class="btn btn-secondary" id="netalertColumnsBtn" title="Elegir y ordenar columnas">
+                            <i class="ri-layout-column-line"></i> Columnas
+                        </button>
                         <button class="btn btn-secondary" id="scanNetworkBtn">
                             <i class="ri-radar-line"></i> Escanear Red
                         </button>
@@ -500,6 +509,47 @@
                             <i class="ri-add-line"></i> Nuevo Dispositivo
                         </button>
                     </div>
+                </div>
+            </div>
+
+            <!-- Bulk actions (shown when devices are selected) -->
+            <div class="bulk-bar hidden" id="bulkBar">
+                <span class="bulk-count"><i class="ri-checkbox-multiple-line"></i> <b id="bulkCount">0</b> seleccionados</span>
+                <div class="bulk-actions">
+                    <button class="btn btn-sm btn-secondary" id="bulkSaveBtn" title="Marcar como guardados (los nuevos)">
+                        <i class="ri-bookmark-line"></i> Guardar
+                    </button>
+                    <select class="select select-sm" id="bulkTypeSelect" title="Cambiar el tipo">
+                        <option value="">Cambiar tipo...</option>
+                    <option value="other">Otro</option>
+                    <option value="router">Router</option>
+                    <option value="switch">Switch</option>
+                    <option value="ap">Punto de Acceso</option>
+                    <option value="server">Servidor</option>
+                    <option value="desktop">PC / Escritorio</option>
+                    <option value="laptop">Portatil</option>
+                    <option value="phone">Telefono</option>
+                    <option value="tablet">Tablet</option>
+                    <option value="printer">Impresora</option>
+                    <option value="camera">Camara IP</option>
+                    <option value="iot">IoT / Smart Home</option>
+                    <option value="nas">NAS / Almacenamiento</option>
+                    <option value="tv">Smart TV / Streaming</option>
+                    <option value="gaming">Consola / Gaming</option>
+                    </select>
+                    <div class="bulk-location">
+                        <input type="text" class="input input-sm" id="bulkLocationInput" placeholder="Ubicacion..." list="bulkLocationList">
+                        <datalist id="bulkLocationList"></datalist>
+                        <button class="btn btn-sm btn-secondary" id="bulkLocationBtn" title="Poner esta ubicacion a todos">
+                            <i class="ri-map-pin-line"></i>
+                        </button>
+                    </div>
+                    <button class="btn btn-sm btn-danger" id="bulkDeleteBtn">
+                        <i class="ri-delete-bin-line"></i> Eliminar
+                    </button>
+                    <button class="btn btn-sm btn-secondary" id="bulkClearBtn" title="Quitar la seleccion">
+                        <i class="ri-close-line"></i>
+                    </button>
                 </div>
             </div>
 
@@ -520,6 +570,94 @@
                     <button class="btn btn-primary" onclick="document.getElementById('scanNetworkBtn').click()">
                         <i class="ri-radar-line"></i> Escanear Ahora
                     </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Page: Inventory -->
+        <section class="page" id="page-inventory">
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-icon devices"><i class="ri-archive-drawer-line"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-label">En Inventario</span>
+                        <span class="stat-value" id="invTotal">0</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon online"><i class="ri-money-euro-circle-line"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-label">Valor de Compra</span>
+                        <span class="stat-value" id="invValue">0 &euro;</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon new-device"><i class="ri-shield-check-line"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-label">Garantia &lt; 90 dias</span>
+                        <span class="stat-value" id="invWarranty">0</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon offline"><i class="ri-inbox-archive-line"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-label">De Baja</span>
+                        <span class="stat-value" id="invRetired">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card no-print">
+                <div class="network-toolbar">
+                    <div class="toolbar-left">
+                        <div class="search-box">
+                            <i class="ri-search-line"></i>
+                            <input type="text" id="inventorySearch" placeholder="Buscar en el inventario..." class="input">
+                        </div>
+                        <div class="filter-group" id="inventoryFilters">
+                            <button class="filter-btn active" data-filter="active">En uso</button>
+                            <button class="filter-btn" data-filter="warranty">Garantia por caducar</button>
+                            <button class="filter-btn" data-filter="physical">Fisicos</button>
+                            <button class="filter-btn" data-filter="virtual">Virtuales</button>
+                            <button class="filter-btn" data-filter="offnet">Fuera de Net Alert</button>
+                            <button class="filter-btn" data-filter="retired">De baja</button>
+                            <button class="filter-btn" data-filter="all">Todos</button>
+                        </div>
+                    </div>
+                    <div class="toolbar-right">
+                        <button class="btn btn-secondary" id="inventoryColumnsBtn" title="Elegir y ordenar columnas">
+                            <i class="ri-layout-column-line"></i> Columnas
+                        </button>
+                        <button class="btn btn-secondary" id="inventoryCsvBtn" title="Descargar CSV (Excel)">
+                            <i class="ri-file-excel-2-line"></i> CSV
+                        </button>
+                        <button class="btn btn-secondary" id="inventoryPrintBtn" title="Imprimir o guardar como PDF">
+                            <i class="ri-printer-line"></i> Imprimir
+                        </button>
+                        <button class="btn btn-primary" id="inventoryAddBtn">
+                            <i class="ri-add-line"></i> Anadir
+                        </button>
+                    </div>
+                </div>
+                <p class="inventory-help">Los dispositivos <b>guardados</b> y <b>manuales</b> de Net Alert se anaden solos. Aqui puedes completar su ficha (modelo, n&ordm; de serie, compra, garantia...) o anadir material que no esta en la red.</p>
+            </div>
+
+            <div class="print-header">
+                <h2>Inventario NetTools</h2>
+                <span id="inventoryPrintDate"></span>
+            </div>
+
+            <div class="section-card inventory-card">
+                <div class="inventory-table-wrap">
+                    <table class="inventory-table" id="inventoryTable">
+                        <thead id="inventoryHead"></thead>
+                        <tbody id="inventoryBody"></tbody>
+                    </table>
+                </div>
+                <div class="empty-state hidden" id="inventoryEmpty">
+                    <i class="ri-archive-drawer-line"></i>
+                    <h3>Inventario vacio</h3>
+                    <p>Guarda dispositivos en Net Alert o anade material manualmente</p>
                 </div>
             </div>
         </section>
@@ -648,20 +786,215 @@
                         </div>
                         <div class="setting-item">
                             <div class="setting-info">
-                                <label>Rango de Red</label>
-                                <p>Subred a escanear (CIDR)</p>
+                                <label>Escanear Red Local</label>
+                                <p>Red del servidor, detectada automaticamente: <span id="localNetworksText" class="mono">...</span></p>
                             </div>
-                            <input type="text" class="input" id="networkRange" placeholder="192.168.1.0/24" value="192.168.1.0/24">
+                            <label class="toggle">
+                                <input type="checkbox" id="scanLocalNetworks" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item setting-item-block">
+                            <div class="setting-info">
+                                <label>Redes Adicionales (VLANs)</label>
+                                <p>Otros rangos a escanear (maximo /22). Si el servidor tiene una interfaz en esa red se usa ARP, con MAC y fabricante. Si solo es accesible a traves del router se hace un escaneo por ping: los equipos se detectan pero sin MAC, y se identifican por su IP.</p>
+                            </div>
+                            <div class="ranges-editor">
+                                <div id="networkRangesList" class="ranges-list"></div>
+                                <div class="ranges-add">
+                                    <input type="text" class="input mono" id="networkRangeInput" placeholder="192.168.20.0/24" autocomplete="off">
+                                    <button class="btn btn-secondary" id="addNetworkRangeBtn">
+                                        <i class="ri-add-line"></i> Anadir
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                         <div class="setting-item">
                             <div class="setting-info">
-                                <label>Notificar Nuevos Dispositivos</label>
-                                <p>Alertar cuando se detecte un dispositivo nuevo</p>
+                                <label>Limpiar Dispositivos Antiguos</label>
+                                <p>Eliminar dispositivos "Nuevo" (nunca guardados) que se han quedado sin IP y no se ven desde hace tiempo. Los guardados y manuales no se eliminan nunca.</p>
                             </div>
                             <label class="toggle">
-                                <input type="checkbox" id="notifyNewDevices" checked>
+                                <input type="checkbox" id="purgeStaleDevices" checked>
                                 <span class="toggle-slider"></span>
                             </label>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Eliminar Tras</label>
+                                <p>Dias sin conectarse antes de eliminarlos</p>
+                            </div>
+                            <select class="select" id="staleDeviceDays">
+                                <option value="7">7 dias</option>
+                                <option value="10" selected>10 dias</option>
+                                <option value="14">14 dias</option>
+                                <option value="30">30 dias</option>
+                                <option value="60">60 dias</option>
+                                <option value="90">90 dias</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scheduled port scan -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <h3><i class="ri-door-open-line"></i> Escaneo de Puertos</h3>
+                    </div>
+                    <div class="setting-group">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Escaneo Diario Automatico</label>
+                                <p>Escanear una vez al dia los puertos de los dispositivos conectados, uno a uno</p>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="autoPortScan">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Hora</label>
+                                <p>Mejor de madrugada, cuando la red esta tranquila</p>
+                            </div>
+                            <select class="select" id="portScanHour">
+                                <option value="0">00:00</option>
+                                <option value="1">01:00</option>
+                                <option value="2">02:00</option>
+                                <option value="3" selected>03:00</option>
+                                <option value="4">04:00</option>
+                                <option value="5">05:00</option>
+                                <option value="6">06:00</option>
+                                <option value="7">07:00</option>
+                                <option value="8">08:00</option>
+                                <option value="9">09:00</option>
+                                <option value="10">10:00</option>
+                                <option value="11">11:00</option>
+                                <option value="12">12:00</option>
+                                <option value="13">13:00</option>
+                                <option value="14">14:00</option>
+                                <option value="15">15:00</option>
+                                <option value="16">16:00</option>
+                                <option value="17">17:00</option>
+                                <option value="18">18:00</option>
+                                <option value="19">19:00</option>
+                                <option value="20">20:00</option>
+                                <option value="21">21:00</option>
+                                <option value="22">22:00</option>
+                                <option value="23">23:00</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Tipo de Escaneo</label>
+                                <p>Rapido: 100 puertos mas comunes. Completo: 1000 puertos con deteccion de version (mas lento)</p>
+                            </div>
+                            <select class="select" id="portScanProfile">
+                                <option value="quick" selected>Rapido (100 puertos)</option>
+                                <option value="full">Completo (1000 puertos)</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Dispositivos</label>
+                                <p>Que dispositivos conectados se escanean</p>
+                            </div>
+                            <select class="select" id="portScanScope">
+                                <option value="online" selected>Todos los conectados</option>
+                                <option value="saved">Solo guardados y manuales</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Escanear Ahora</label>
+                                <p id="bulkPortScanStatus">Lanza el escaneo de todos los dispositivos ahora (con la configuracion guardada)</p>
+                            </div>
+                            <button class="btn btn-secondary" id="bulkPortScanBtn">
+                                <i class="ri-play-line"></i> Escanear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- UniFi integration -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <h3><i class="ri-router-line"></i> Integracion UniFi</h3>
+                    </div>
+                    <div class="setting-group">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Leer Clientes de UniFi</label>
+                                <p>En cada escaneo se consulta la lista de clientes del router UniFi: MAC, IP, nombre y red/VLAN de todos los equipos conectados, tambien los de otras VLANs.</p>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="unifiEnabled">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Direccion de la Consola</label>
+                                <p>IP o URL de la consola UniFi (UDM, UCG, Cloud Key...)</p>
+                            </div>
+                            <input type="text" class="input mono" id="unifiUrl" placeholder="https://192.168.1.1" autocomplete="off">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Autenticacion</label>
+                                <p>API key (UniFi Network 9 o superior) o una cuenta local sin 2FA</p>
+                            </div>
+                            <select class="select" id="unifiAuth">
+                                <option value="api_key" selected>API key</option>
+                                <option value="login">Usuario y contrasena</option>
+                            </select>
+                        </div>
+                        <div class="setting-item unifi-auth-api_key">
+                            <div class="setting-info">
+                                <label>API Key</label>
+                                <p>Creala en UniFi: Settings &rarr; Control Plane &rarr; Integrations</p>
+                            </div>
+                            <input type="password" class="input mono" id="unifiApiKey" placeholder="API key" autocomplete="new-password">
+                        </div>
+                        <div class="setting-item unifi-auth-login" hidden>
+                            <div class="setting-info">
+                                <label>Usuario</label>
+                                <p>Cuenta local de la consola (rol de solo lectura es suficiente)</p>
+                            </div>
+                            <input type="text" class="input" id="unifiUsername" placeholder="nettools" autocomplete="off">
+                        </div>
+                        <div class="setting-item unifi-auth-login" hidden>
+                            <div class="setting-info">
+                                <label>Contrasena</label>
+                                <p>Contrasena de la cuenta local</p>
+                            </div>
+                            <input type="password" class="input" id="unifiPassword" autocomplete="new-password">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Sitio</label>
+                                <p>Nombre interno del sitio UniFi (normalmente "default")</p>
+                            </div>
+                            <input type="text" class="input mono" id="unifiSite" placeholder="default" autocomplete="off">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Verificar Certificado</label>
+                                <p>Desactivado si la consola usa su certificado autofirmado (lo habitual)</p>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="unifiVerifySsl">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Probar Conexion</label>
+                                <p id="unifiTestResult">Comprueba que NetTools puede leer los clientes de UniFi</p>
+                            </div>
+                            <button class="btn btn-secondary" id="testUnifiBtn">
+                                <i class="ri-plug-line"></i> Probar
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -675,7 +1008,7 @@
                         <div class="setting-item">
                             <div class="setting-info">
                                 <label>Activar Telegram</label>
-                                <p>Enviar notificaciones al detectar nuevos dispositivos</p>
+                                <p>Enviar notificaciones por Telegram (nuevos dispositivos y tests de velocidad)</p>
                             </div>
                             <label class="toggle">
                                 <input type="checkbox" id="telegramEnabled">
@@ -695,6 +1028,53 @@
                                 <p>ID del chat o grupo donde enviar alertas</p>
                             </div>
                             <input type="text" class="input" id="telegramChatId" placeholder="-1001234567890" autocomplete="off">
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Nuevos Dispositivos</label>
+                                <p>Avisar cuando el escaneo de red detecte un dispositivo nuevo</p>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="notifyNewDevices" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Cambios en Puertos</label>
+                                <p>Avisar si el escaneo diario de puertos detecta puertos nuevos abiertos o cerrados</p>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="notifyNewPorts" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Resultado de Tests Programados</label>
+                                <p>Enviar el resultado de cada test de velocidad automatico (y avisar si falla)</p>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="notifySpeedTests">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Cuando Avisar</label>
+                                <p>Siempre, o solo si la descarga o la subida bajan del umbral</p>
+                            </div>
+                            <select class="select" id="speedTestAlertThreshold">
+                                <option value="0" selected>Siempre</option>
+                                <option value="50">Si baja de 50 Mbps</option>
+                                <option value="100">Si baja de 100 Mbps</option>
+                                <option value="200">Si baja de 200 Mbps</option>
+                                <option value="300">Si baja de 300 Mbps</option>
+                                <option value="500">Si baja de 500 Mbps</option>
+                                <option value="700">Si baja de 700 Mbps</option>
+                                <option value="800">Si baja de 800 Mbps</option>
+                                <option value="900">Si baja de 900 Mbps</option>
+                            </select>
                         </div>
                         <div class="setting-item">
                             <div class="setting-info">
@@ -824,8 +1204,8 @@
                                 <i class="ri-global-line"></i>
                             </div>
                             <h2>NetTools</h2>
-                            <p class="version">Version 1.0.0</p>
-                            <p class="about-developer">Desarrollado por <a href="https://bytebeat.es" target="_blank">bytebeat.es</a></p>
+                            <p class="version">Version 1.1.3</p>
+                            <p class="about-developer">Desarrollado por <a href="https://braut.es" target="_blank">braut.es</a></p>
                         </div>
                         <div class="about-details">
                             <div class="about-row">
@@ -897,6 +1277,7 @@
                 <div class="form-group">
                     <label>Descripcion</label>
                     <textarea class="input textarea" id="deviceDescription" placeholder="Ej: Router WiFi del salon" rows="2"></textarea>
+                    <small class="form-hint" id="deviceDescriptionHint" hidden><i class="ri-lightbulb-line"></i> Pista automatica segun fabricante, nombre y puertos. Si la cambias, se queda tu texto.</small>
                 </div>
                 <div class="form-group">
                     <label>Ubicacion</label>
@@ -924,10 +1305,284 @@
                 </div>
             </div>
             <div class="modal-footer">
+                <button class="btn btn-secondary modal-footer-left" id="modalMerge" title="Es el mismo equipo que otro registro (p. ej. un movil que ha cambiado de MAC)">
+                    <i class="ri-git-merge-line"></i> Fusionar...
+                </button>
                 <button class="btn btn-secondary" id="modalCancel">Cancelar</button>
                 <button class="btn btn-primary" id="modalSave">
                     <i class="ri-save-line"></i> Guardar
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Columns Modal -->
+    <div class="modal-overlay" id="columnsModal">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <h3 id="colCfgTitle">Columnas</h3>
+                <button class="modal-close" id="colCfgClose" aria-label="Cerrar">
+                    <i class="ri-close-line"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="colcfg-help">Marca las columnas que quieres ver y arrastralas para cambiar el orden.</p>
+                <ul class="colcfg-list" id="colCfgList"></ul>
+                <div class="form-row colcfg-sort">
+                    <div class="form-group">
+                        <label for="colCfgSortField">Ordenar por defecto por</label>
+                        <select class="select" id="colCfgSortField"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="colCfgSortDir">Sentido</label>
+                        <select class="select" id="colCfgSortDir">
+                            <option value="asc">Ascendente (A-Z, 0-9)</option>
+                            <option value="desc">Descendente (Z-A, 9-0)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary modal-footer-left" id="colCfgReset">
+                    <i class="ri-arrow-go-back-line"></i> Restablecer
+                </button>
+                <button class="btn btn-secondary" id="colCfgCancel">Cancelar</button>
+                <button class="btn btn-primary" id="colCfgSave">
+                    <i class="ri-save-line"></i> Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Inventory Item Modal -->
+    <div class="modal-overlay" id="inventoryModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="inventoryModalTitle">Ficha de inventario</h3>
+                <button class="modal-close" id="inventoryModalClose" aria-label="Cerrar">
+                    <i class="ri-close-line"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="invId">
+                <div class="inventory-link-info" id="invLinkInfo"></div>
+                <div class="inv-logo-editor" id="invLogoEditor">
+                    <span class="inv-logo inv-logo-lg" id="invLogoPreview"></span>
+                    <div class="inv-logo-editor-info">
+                        <div class="inv-logo-editor-title">Logo del fabricante</div>
+                        <div class="inv-sub" id="invLogoHint">Se busca automaticamente segun la marca</div>
+                        <div class="inv-logo-editor-actions">
+                            <button type="button" class="btn btn-sm btn-secondary" id="invLogoUploadBtn">
+                                <i class="ri-image-add-line"></i> Subir logo
+                            </button>
+                            <button type="button" class="btn btn-sm btn-secondary" id="invLogoResetBtn">
+                                <i class="ri-arrow-go-back-line"></i> Usar el automatico
+                            </button>
+                            <input type="file" id="invLogoFile" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="invName">Nombre</label>
+                    <input type="text" class="input" id="invName" placeholder="Ej: NAS del despacho">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="invType">Tipo</label>
+                        <select class="select" id="invType">
+                            <option value="other">Otro</option>
+                            <option value="router">Router</option>
+                            <option value="switch">Switch</option>
+                            <option value="ap">Punto de Acceso</option>
+                            <option value="server">Servidor</option>
+                            <option value="desktop">PC / Escritorio</option>
+                            <option value="laptop">Portatil</option>
+                            <option value="phone">Telefono</option>
+                            <option value="tablet">Tablet</option>
+                            <option value="printer">Impresora</option>
+                            <option value="camera">Camara IP</option>
+                            <option value="iot">IoT / Smart Home</option>
+                            <option value="nas">NAS / Almacenamiento</option>
+                            <option value="tv">Smart TV / Streaming</option>
+                            <option value="gaming">Consola / Gaming</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="invStatus">Estado</label>
+                        <select class="select" id="invStatus">
+                            <option value="active">En uso</option>
+                            <option value="retired">De baja</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="invBrand">Marca</label>
+                        <input type="text" class="input" id="invBrand" placeholder="Ej: Synology">
+                    </div>
+                    <div class="form-group">
+                        <label for="invModel">Modelo</label>
+                        <input type="text" class="input" id="invModel" placeholder="Ej: DS920+">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="invKind">Tipo de activo</label>
+                        <select class="select" id="invKind">
+                            <option value="physical">Fisico</option>
+                            <option value="vm">Maquina virtual (VM)</option>
+                            <option value="lxc">Contenedor LXC</option>
+                            <option value="docker">Contenedor Docker</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="invSerial" id="invSerialLabel">N&ordm; de serie</label>
+                        <input type="text" class="input mono" id="invSerial">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group inv-virtual-only">
+                        <label for="invHost">Anfitrion</label>
+                        <input type="text" class="input" id="invHost" list="invHostList" placeholder="Ej: Proxmox01">
+                        <datalist id="invHostList"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label for="invLocation">Ubicacion</label>
+                        <input type="text" class="input" id="invLocation" placeholder="Ej: Despacho, Rack A3">
+                    </div>
+                </div>
+                <div class="form-row inv-net-fields">
+                    <div class="form-group">
+                        <label for="invIP">Direccion IP</label>
+                        <input type="text" class="input mono" id="invIP" placeholder="Opcional">
+                    </div>
+                    <div class="form-group">
+                        <label for="invMAC">Direccion MAC</label>
+                        <input type="text" class="input mono" id="invMAC" placeholder="Opcional">
+                    </div>
+                </div>
+                <div class="form-row inv-physical-only">
+                    <div class="form-group">
+                        <label for="invPurchaseDate">Fecha de compra</label>
+                        <input type="date" class="input" id="invPurchaseDate">
+                    </div>
+                    <div class="form-group">
+                        <label for="invPrice">Precio (&euro;)</label>
+                        <input type="number" class="input" id="invPrice" min="0" step="0.01" placeholder="0,00">
+                    </div>
+                </div>
+                <div class="form-row inv-physical-only">
+                    <div class="form-group">
+                        <label for="invWarranty">Garantia hasta</label>
+                        <input type="date" class="input" id="invWarranty">
+                        <div class="inv-warranty-quick">
+                            <button type="button" class="btn btn-sm btn-secondary" data-years="2">+2 anos</button>
+                            <button type="button" class="btn btn-sm btn-secondary" data-years="3">+3 anos</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="invSupplier">Tienda / Proveedor</label>
+                        <input type="text" class="input" id="invSupplier" placeholder="Ej: Amazon, PcComponentes">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="invDescription">Descripcion</label>
+                    <input type="text" class="input" id="invDescription">
+                </div>
+                <div class="form-group">
+                    <label for="invNotes">Notas</label>
+                    <textarea class="input textarea" id="invNotes" rows="3" placeholder="Factura, n&ordm; de pedido, accesorios, licencias..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary modal-footer-left" id="inventoryDelete">
+                    <i class="ri-delete-bin-line"></i> Quitar
+                </button>
+                <button class="btn btn-secondary" id="inventoryCancel">Cancelar</button>
+                <button class="btn btn-primary" id="inventorySave">
+                    <i class="ri-save-line"></i> Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Merge Devices Modal -->
+    <div class="modal-overlay" id="mergeModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Fusionar dispositivos</h3>
+                <button class="modal-close" id="mergeModalClose" aria-label="Cerrar">
+                    <i class="ri-close-line"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="merge-help">
+                    Usalo cuando dos registros son el mismo equipo, por ejemplo un iPhone o un portatil
+                    que se ha conectado con una MAC privada nueva. El resultado conserva el nombre y los
+                    datos que elijas y usa la MAC e IP mas recientes. El otro registro se elimina.
+                </p>
+                <div class="form-group">
+                    <label>Este dispositivo</label>
+                    <div class="merge-device-card" id="mergeThis"></div>
+                </div>
+                <div class="form-group">
+                    <label for="mergeSearch">Es el mismo equipo que</label>
+                    <input type="text" class="input" id="mergeSearch" placeholder="Filtrar por nombre, IP, MAC o marca...">
+                    <select class="select merge-select" id="mergeTarget" size="7"></select>
+                </div>
+                <div class="form-group">
+                    <label for="mergeKeep">Conservar nombre, tipo y ubicacion de</label>
+                    <select class="select" id="mergeKeep">
+                        <option value="other">El dispositivo seleccionado</option>
+                        <option value="this">Este dispositivo</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="mergeCancel">Cancelar</button>
+                <button class="btn btn-primary" id="mergeConfirm">
+                    <i class="ri-git-merge-line"></i> Fusionar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Device Ports Modal -->
+    <div class="modal-overlay" id="portsModal">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <div>
+                    <h3 id="portsModalTitle">Puertos</h3>
+                    <div class="ports-subtitle" id="portsModalSubtitle"></div>
+                </div>
+                <button class="modal-close" id="portsModalClose" aria-label="Cerrar">
+                    <i class="ri-close-line"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="ports-toolbar">
+                    <select class="select ports-profile" id="portsProfile">
+                        <option value="quick">Rapido (100 puertos comunes)</option>
+                        <option value="full">Completo (1000 puertos + versiones)</option>
+                    </select>
+                    <button class="btn btn-primary" id="portsScanBtn">
+                        <i class="ri-scan-2-line"></i> Escanear
+                    </button>
+                </div>
+                <div class="ports-status" id="portsStatus"></div>
+                <div class="table-responsive">
+                    <table class="data-table ports-table">
+                        <thead>
+                            <tr>
+                                <th>Puerto</th>
+                                <th>Servicio</th>
+                                <th>Producto / Version</th>
+                                <th>Visto desde</th>
+                            </tr>
+                        </thead>
+                        <tbody id="portsTableBody"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -954,11 +1609,13 @@
         </div>
     </div>
 
-    <script src="js/api.js"></script>
-    <script src="js/app.js"></script>
-    <script src="js/speedtest.js"></script>
-    <script src="js/netcheck.js"></script>
-    <script src="js/network.js"></script>
-    <script src="js/settings.js"></script>
+    <script src="js/api.js?v=__BUILD__"></script>
+    <script src="js/app.js?v=__BUILD__"></script>
+    <script src="js/speedtest.js?v=__BUILD__"></script>
+    <script src="js/netcheck.js?v=__BUILD__"></script>
+    <script src="js/columns.js?v=__BUILD__"></script>
+    <script src="js/network.js?v=__BUILD__"></script>
+    <script src="js/settings.js?v=__BUILD__"></script>
+    <script src="js/inventory.js?v=__BUILD__"></script>
 </body>
 </html>

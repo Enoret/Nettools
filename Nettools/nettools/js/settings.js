@@ -4,6 +4,7 @@
 
 const SettingsPage = {
     initialized: false,
+    networkRanges: [],   // extra ranges being edited: [{cidr, method, interface}]
 
     // Default colors
     defaults: {
@@ -48,8 +49,28 @@ const SettingsPage = {
             );
         });
 
+        // Network ranges editor
+        document.getElementById('addNetworkRangeBtn').addEventListener('click', () => this.addNetworkRange());
+        document.getElementById('networkRangeInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') this.addNetworkRange();
+        });
+        document.getElementById('networkRangesList').addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-remove-range]');
+            if (!btn) return;
+            this.networkRanges = this.networkRanges.filter(r => r.cidr !== btn.dataset.removeRange);
+            this.renderNetworkRanges();
+        });
+
         // Telegram test
         document.getElementById('testTelegramBtn').addEventListener('click', () => this.testTelegram());
+
+        // Bulk port scan
+        document.getElementById('bulkPortScanBtn').addEventListener('click', () => this.startBulkPortScan());
+        this.pollBulkPortScan();
+
+        // UniFi
+        document.getElementById('unifiAuth').addEventListener('change', () => this.updateUnifiAuthFields());
+        document.getElementById('testUnifiBtn').addEventListener('click', () => this.testUnifi());
 
         // Color pickers
         this.bindColorPicker('accentColor', '--accent', 'accent');
@@ -211,9 +232,8 @@ const SettingsPage = {
         try {
             const settings = await API.settings.getAll();
             this.applySettings(settings);
-        } catch {
-            // Load from localStorage
-            this.applySettings(this.getLocalSettings());
+        } catch (err) {
+            Toast.error(`No se pudieron cargar los ajustes: ${err.message}`);
         }
     },
 
@@ -233,11 +253,24 @@ const SettingsPage = {
         if (settings.network_scan_frequency) {
             document.getElementById('networkScanFrequency').value = settings.network_scan_frequency;
         }
-        if (settings.network_range) {
-            document.getElementById('networkRange').value = settings.network_range;
+        if (settings.scan_local_networks !== undefined) {
+            document.getElementById('scanLocalNetworks').checked = settings.scan_local_networks;
         }
+        this.loadNetworkInfo();
         if (settings.notify_new_devices !== undefined) {
             document.getElementById('notifyNewDevices').checked = settings.notify_new_devices;
+        }
+        if (settings.notify_speed_tests !== undefined) {
+            document.getElementById('notifySpeedTests').checked = settings.notify_speed_tests;
+        }
+        if (settings.speed_test_alert_threshold !== undefined) {
+            document.getElementById('speedTestAlertThreshold').value = settings.speed_test_alert_threshold;
+        }
+        if (settings.purge_stale_devices !== undefined) {
+            document.getElementById('purgeStaleDevices').checked = settings.purge_stale_devices;
+        }
+        if (settings.stale_device_days) {
+            document.getElementById('staleDeviceDays').value = settings.stale_device_days;
         }
         // Telegram
         if (settings.telegram_enabled !== undefined) {
@@ -249,30 +282,26 @@ const SettingsPage = {
         if (settings.telegram_chat_id !== undefined) {
             document.getElementById('telegramChatId').value = settings.telegram_chat_id || '';
         }
+        // Port scan
+        document.getElementById('autoPortScan').checked = !!settings.auto_port_scan;
+        document.getElementById('portScanHour').value = settings.port_scan_hour || '3';
+        document.getElementById('portScanProfile').value = settings.port_scan_profile || 'quick';
+        document.getElementById('portScanScope').value = settings.port_scan_scope || 'online';
+        document.getElementById('notifyNewPorts').checked = settings.notify_new_ports !== false;
+        // UniFi
+        document.getElementById('unifiEnabled').checked = !!settings.unifi_enabled;
+        document.getElementById('unifiUrl').value = settings.unifi_url || '';
+        document.getElementById('unifiAuth').value = settings.unifi_auth || 'api_key';
+        document.getElementById('unifiApiKey').value = settings.unifi_api_key || '';
+        document.getElementById('unifiUsername').value = settings.unifi_username || '';
+        document.getElementById('unifiPassword').value = settings.unifi_password || '';
+        document.getElementById('unifiSite').value = settings.unifi_site || 'default';
+        document.getElementById('unifiVerifySsl').checked = !!settings.unifi_verify_ssl;
+        this.updateUnifiAuthFields();
         // Timezone
         if (settings.timezone !== undefined) {
             document.getElementById('timezoneSelect').value = settings.timezone;
         }
-    },
-
-    getLocalSettings() {
-        const saved = localStorage.getItem('nettools-settings');
-        if (saved) {
-            try { return JSON.parse(saved); } catch {}
-        }
-        return {
-            auto_speed_test: true,
-            speed_test_frequency: '60',
-            speed_test_retention: '30',
-            auto_network_scan: true,
-            network_scan_frequency: '15',
-            network_range: '192.168.1.0/24',
-            notify_new_devices: true,
-            telegram_enabled: false,
-            telegram_bot_token: '',
-            telegram_chat_id: '',
-            timezone: '1',
-        };
     },
 
     async saveSettings() {
@@ -282,21 +311,89 @@ const SettingsPage = {
             speed_test_retention: document.getElementById('speedTestRetention').value,
             auto_network_scan: document.getElementById('autoNetworkScan').checked,
             network_scan_frequency: document.getElementById('networkScanFrequency').value,
-            network_range: document.getElementById('networkRange').value,
+            scan_local_networks: document.getElementById('scanLocalNetworks').checked,
+            network_ranges: this.networkRanges.map(r => r.cidr).join(','),
             notify_new_devices: document.getElementById('notifyNewDevices').checked,
+            notify_speed_tests: document.getElementById('notifySpeedTests').checked,
+            speed_test_alert_threshold: document.getElementById('speedTestAlertThreshold').value,
+            purge_stale_devices: document.getElementById('purgeStaleDevices').checked,
+            stale_device_days: document.getElementById('staleDeviceDays').value,
             telegram_enabled: document.getElementById('telegramEnabled').checked,
             telegram_bot_token: document.getElementById('telegramBotToken').value.trim(),
             telegram_chat_id: document.getElementById('telegramChatId').value.trim(),
             timezone: document.getElementById('timezoneSelect').value,
+            auto_port_scan: document.getElementById('autoPortScan').checked,
+            port_scan_hour: document.getElementById('portScanHour').value,
+            port_scan_profile: document.getElementById('portScanProfile').value,
+            port_scan_scope: document.getElementById('portScanScope').value,
+            notify_new_ports: document.getElementById('notifyNewPorts').checked,
+            ...this.getUnifiSettings(),
         };
 
         try {
             await API.settings.update(settings);
             Toast.success('Configuracion guardada');
-        } catch {
-            // Save locally
-            localStorage.setItem('nettools-settings', JSON.stringify(settings));
-            Toast.success('Configuracion guardada localmente');
+            return true;
+        } catch (err) {
+            Toast.error(`No se pudo guardar la configuracion: ${err.message}`);
+            return false;
+        }
+    },
+
+    // --- Network ranges ---
+    async loadNetworkInfo() {
+        const localText = document.getElementById('localNetworksText');
+        try {
+            const info = await API.network.info();
+            localText.textContent = info.local_networks.length
+                ? info.local_networks.map(n => `${n.cidr} (${n.interface})`).join(', ')
+                : 'ninguna detectada';
+            this.networkRanges = info.ranges.filter(r => r.source === 'manual');
+        } catch (err) {
+            localText.textContent = 'no disponible';
+            this.networkRanges = [];
+        }
+        this.renderNetworkRanges();
+    },
+
+    renderNetworkRanges() {
+        const list = document.getElementById('networkRangesList');
+        if (!this.networkRanges.length) {
+            list.innerHTML = '<div class="ranges-empty">Sin redes adicionales: solo se escanea la red local.</div>';
+            return;
+        }
+        const esc = (v) => NetworkPage.escapeHtml(String(v ?? ''));
+        list.innerHTML = this.networkRanges.map(r => `
+            <div class="range-row">
+                <span class="range-cidr mono">${esc(r.cidr)}</span>
+                <span class="range-method">
+                    ${r.method === 'arp'
+                        ? `<span class="range-badge arp">ARP</span>interfaz ${esc(r.interface)} · con MAC`
+                        : '<span class="range-badge routed">Ping</span>red enrutada · sin MAC (por IP)'}
+                </span>
+                <button class="device-action-btn delete" data-remove-range="${esc(r.cidr)}" title="Quitar">
+                    <i class="ri-delete-bin-line"></i>
+                </button>
+            </div>
+        `).join('');
+    },
+
+    async addNetworkRange() {
+        const input = document.getElementById('networkRangeInput');
+        const value = input.value.trim();
+        if (!value) return;
+        try {
+            const range = await API.network.check(value);
+            if (this.networkRanges.some(r => r.cidr === range.cidr)) {
+                Toast.warning(`${range.cidr} ya esta en la lista`);
+                return;
+            }
+            this.networkRanges.push(range);
+            this.renderNetworkRanges();
+            input.value = '';
+            Toast.info(`${range.cidr} anadida. Pulsa "Guardar" para aplicar.`);
+        } catch (err) {
+            Toast.error(err.message);
         }
     },
 
@@ -304,17 +401,10 @@ const SettingsPage = {
         try {
             const data = await API.exportData();
             this.downloadJSON(data, 'nettools-export.json');
-        } catch {
-            // Export local data
-            const exportData = {
-                exported_at: new Date().toISOString(),
-                settings: this.getLocalSettings(),
-                devices: NetworkPage.devices || [],
-                message: 'Datos exportados desde modo demo',
-            };
-            this.downloadJSON(exportData, 'nettools-export.json');
+            Toast.success('Datos exportados');
+        } catch (err) {
+            Toast.error(`No se pudieron exportar los datos: ${err.message}`);
         }
-        Toast.success('Datos exportados');
     },
 
     downloadJSON(data, filename) {
@@ -333,8 +423,9 @@ const SettingsPage = {
         try {
             await API.speedtest.clearAll();
             Toast.success('Historial de tests eliminado');
-        } catch {
-            Toast.success('Historial limpiado (demo)');
+        } catch (err) {
+            Toast.error(`No se pudo limpiar el historial: ${err.message}`);
+            return;
         }
         // Reset SpeedTestPage UI
         if (typeof SpeedTestPage !== 'undefined' && SpeedTestPage.chartsInitialized) {
@@ -382,11 +473,92 @@ const SettingsPage = {
             NetworkPage.devices = [];
             NetworkPage.updateStats();
             NetworkPage.renderDevices();
-        } catch {
-            NetworkPage.devices = [];
-            NetworkPage.updateStats();
-            NetworkPage.renderDevices();
-            Toast.success('Dispositivos reiniciados (demo)');
+        } catch (err) {
+            Toast.error(`No se pudieron reiniciar los dispositivos: ${err.message}`);
+        }
+    },
+
+    async startBulkPortScan() {
+        try {
+            await API.settings.scanAllPorts();
+            Toast.success('Escaneo de puertos de toda la red iniciado');
+        } catch (err) {
+            Toast.error(err.message || 'No se pudo iniciar el escaneo');
+        }
+        this.pollBulkPortScan();
+    },
+
+    async pollBulkPortScan() {
+        clearTimeout(this._bulkPollTimer);
+        const btn = document.getElementById('bulkPortScanBtn');
+        const out = document.getElementById('bulkPortScanStatus');
+        let st;
+        try {
+            st = await API.settings.scanAllPortsStatus();
+        } catch (err) {
+            return;
+        }
+        btn.disabled = !!st.running;
+        if (st.running) {
+            out.textContent = st.total
+                ? `Escaneando ${st.done}/${st.total}${st.current ? ': ' + st.current : ''}...`
+                : 'Iniciando escaneo...';
+            this._bulkPollTimer = setTimeout(() => this.pollBulkPortScan(), 3000);
+            this._bulkWasRunning = true;
+        } else if (st.summary) {
+            const s = st.summary;
+            out.textContent = `Ultimo escaneo (${st.finished_at}): ${s.devices} dispositivos, ` +
+                `${s.open_ports} puertos abiertos, ${s.changed_devices} con cambios` +
+                (s.errors ? `, ${s.errors} errores` : '');
+            if (this._bulkWasRunning) {
+                this._bulkWasRunning = false;
+                Toast.success('Escaneo de puertos completado');
+                if (typeof NetworkPage !== 'undefined' && NetworkPage.loadDevices) NetworkPage.loadDevices();
+            }
+        }
+    },
+
+    getUnifiSettings() {
+        return {
+            unifi_enabled: document.getElementById('unifiEnabled').checked,
+            unifi_url: document.getElementById('unifiUrl').value.trim(),
+            unifi_auth: document.getElementById('unifiAuth').value,
+            unifi_api_key: document.getElementById('unifiApiKey').value.trim(),
+            unifi_username: document.getElementById('unifiUsername').value.trim(),
+            unifi_password: document.getElementById('unifiPassword').value,
+            unifi_site: document.getElementById('unifiSite').value.trim() || 'default',
+            unifi_verify_ssl: document.getElementById('unifiVerifySsl').checked,
+        };
+    },
+
+    updateUnifiAuthFields() {
+        const mode = document.getElementById('unifiAuth').value;
+        document.querySelectorAll('.unifi-auth-api_key').forEach(el => { el.hidden = mode !== 'api_key'; });
+        document.querySelectorAll('.unifi-auth-login').forEach(el => { el.hidden = mode !== 'login'; });
+    },
+
+    async testUnifi() {
+        const btn = document.getElementById('testUnifiBtn');
+        const out = document.getElementById('unifiTestResult');
+        const origHTML = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="ri-loader-4-line" style="animation:spin 1s linear infinite"></i> Probando...';
+        out.classList.remove('text-success', 'text-danger');
+        try {
+            const r = await API.settings.testUnifi(this.getUnifiSettings());
+            const nets = Object.entries(r.networks || {})
+                .sort((a, b) => b[1] - a[1])
+                .map(([n, c]) => `${n}: ${c}`).join(', ');
+            out.textContent = `OK: ${r.clients} clientes conectados${nets ? ' (' + nets + ')' : ''}`;
+            out.classList.add('text-success');
+            Toast.success('Conexion con UniFi correcta. Guarda la configuracion para usarla en los escaneos.');
+        } catch (err) {
+            out.textContent = `Error: ${err.message}`;
+            out.classList.add('text-danger');
+            Toast.error(err.message || 'No se pudo conectar con UniFi');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = origHTML;
         }
     },
 
@@ -397,7 +569,12 @@ const SettingsPage = {
         btn.innerHTML = '<i class="ri-loader-4-line" style="animation:spin 1s linear infinite"></i> Enviando...';
 
         // Save current settings first so backend has the token/chat_id
-        await this.saveSettings();
+        const saved = await this.saveSettings();
+        if (!saved) {
+            btn.disabled = false;
+            btn.innerHTML = origHTML;
+            return;
+        }
 
         try {
             await API.settings.testTelegram();

@@ -1259,7 +1259,7 @@ body {
     box-shadow: var(--shadow-sm);
     transition: all var(--transition);
     display: grid;
-    grid-template-columns: 8px 34px minmax(120px, 1.5fr) minmax(100px, 1fr) minmax(110px, 1fr) minmax(80px, 0.8fr) minmax(80px, 0.8fr) 70px 80px;
+    grid-template-columns: var(--device-grid-cols, 18px 8px 34px minmax(120px, 1.5fr) minmax(100px, 1fr) minmax(110px, 1fr) minmax(100px, 1fr) 76px 108px);
     align-items: center;
     gap: 0 14px;
     position: relative;
@@ -1736,7 +1736,7 @@ body {
 /* Device List Column Headers */
 .devices-list-header {
     display: grid;
-    grid-template-columns: 8px 34px minmax(120px, 1.5fr) minmax(100px, 1fr) minmax(110px, 1fr) minmax(80px, 0.8fr) minmax(80px, 0.8fr) 70px 80px;
+    grid-template-columns: var(--device-grid-cols, 18px 8px 34px minmax(120px, 1.5fr) minmax(100px, 1fr) minmax(110px, 1fr) minmax(100px, 1fr) 76px 108px);
     align-items: center;
     gap: 0 14px;
     padding: 8px 16px;
@@ -1776,7 +1776,7 @@ body {
 }
 
 /* Column classes used for both header and card (grid handles sizing) */
-.col-name, .col-ip, .col-mac, .col-brand, .col-location, .col-state, .col-actions {
+.devices-grid [class*="col-"]:not(.col-select):not(.col-icon):not(.col-status) {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1896,17 +1896,6 @@ body {
         font-size: 1.6rem;
     }
 
-    .device-card,
-    .devices-list-header {
-        grid-template-columns: 8px 34px minmax(100px, 1.5fr) minmax(90px, 1fr) minmax(100px, 1fr) 70px 80px;
-    }
-
-    .col-brand,
-    .col-location,
-    .devices-list-header .col-brand,
-    .devices-list-header .col-location {
-        display: none;
-    }
 }
 
 @media (max-width: 768px) {
@@ -1991,22 +1980,12 @@ body {
 
     .device-card,
     .devices-list-header {
-        grid-template-columns: 8px 34px minmax(80px, 1.5fr) minmax(80px, 1fr) 70px 60px;
         gap: 0 8px;
         padding: 8px 10px;
     }
 
     .devices-list-header {
         padding: 6px 10px;
-    }
-
-    .col-mac,
-    .col-brand,
-    .col-location,
-    .devices-list-header .col-brand,
-    .devices-list-header .col-location,
-    .devices-list-header .col-mac {
-        display: none;
     }
 
     .device-detail-col {
@@ -2029,11 +2008,6 @@ body {
         padding-bottom: 4px;
     }
 
-    .devices-list-header .col-brand,
-    .devices-list-header .col-location,
-    .devices-list-header .col-mac {
-        display: none;
-    }
 }
 
 @media (max-width: 480px) {
@@ -2175,7 +2149,7 @@ body {
    ========================================== */
 
 .device-history-card {
-    margin-bottom: 0;
+    margin-bottom: 24px; /* same gap as between the stat cards and the toolbar */
 }
 
 .device-history-chart {
@@ -2525,3 +2499,593 @@ body {
     height: 20px;
     background: var(--border);
 }
+
+/* --- Device Ports --- */
+.device-ports-btn {
+    position: relative;
+}
+
+.device-ports-count {
+    position: absolute;
+    top: -2px;
+    right: -3px;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 3px;
+    border-radius: 7px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.55rem;
+    font-weight: 700;
+    line-height: 14px;
+    text-align: center;
+}
+
+.modal-lg {
+    max-width: 760px;
+}
+
+.ports-subtitle {
+    margin-top: 2px;
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+    font-family: var(--font-mono, monospace);
+}
+
+.ports-toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.ports-profile {
+    flex: 1;
+    min-width: 220px;
+}
+
+.ports-status {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    min-height: 1.2em;
+}
+
+.ports-status .ports-diff-new {
+    color: var(--warning-text);
+    font-weight: 600;
+}
+
+.ports-status .ports-diff-closed {
+    color: var(--text-tertiary);
+}
+
+.ports-table td {
+    vertical-align: middle;
+}
+
+.ports-table .port-number {
+    font-family: var(--font-mono, monospace);
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.ports-table .port-number a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.ports-table .port-number a:hover {
+    text-decoration: underline;
+}
+
+.ports-table .port-proto {
+    font-weight: 400;
+    color: var(--text-tertiary);
+    font-size: 0.75rem;
+    margin-left: 2px;
+}
+
+.ports-table tr.port-new td {
+    background: var(--warning-light);
+}
+
+.ports-table .port-badge-new {
+    margin-left: 6px;
+}
+
+@media (max-width: 768px) {
+    .ports-table th:nth-child(4),
+    .ports-table td:nth-child(4) {
+        display: none;
+    }
+}
+
+/* --- Service icons in device list --- */
+.device-services {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+    vertical-align: middle;
+}
+
+.service-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    transition: all var(--transition);
+}
+
+.service-icon:hover {
+    background: var(--accent);
+    color: #fff;
+}
+
+.service-icon.warn {
+    background: var(--danger-light);
+    color: var(--danger);
+}
+
+/* Released / last known IP */
+.last-ip {
+    color: var(--text-tertiary);
+    font-style: italic;
+}
+
+.mac-private-badge {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 1px 6px;
+    border-radius: 50px;
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    vertical-align: middle;
+    background: var(--info-light);
+    color: var(--info);
+    font-family: var(--font);
+}
+
+/* --- Merge modal --- */
+.modal-footer-left {
+    margin-right: auto;
+}
+
+.merge-help {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+    line-height: 1.5;
+}
+
+.merge-device-card {
+    padding: 10px 12px;
+    border-radius: var(--radius-xs);
+    background: var(--bg-tertiary);
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+.merge-select {
+    margin-top: 8px;
+    width: 100%;
+    height: auto;
+    padding: 4px;
+}
+
+.merge-select option {
+    padding: 6px 8px;
+    border-radius: 4px;
+}
+
+/* --- Network ranges editor (Settings) --- */
+.mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.setting-item.setting-item-block {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+}
+
+.ranges-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ranges-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.range-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: var(--radius-xs);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-light);
+    font-size: 0.85rem;
+}
+
+.range-row .range-cidr {
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 140px;
+}
+
+.range-row .range-method {
+    flex: 1;
+    color: var(--text-tertiary);
+    font-size: 0.8rem;
+}
+
+.range-badge {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 50px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-right: 6px;
+}
+
+.range-badge.arp {
+    background: var(--success-light);
+    color: var(--success-text);
+}
+
+.range-badge.routed {
+    background: var(--warning-light);
+    color: var(--warning-text);
+}
+
+.ranges-empty {
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+    padding: 4px 0;
+}
+
+.ranges-add {
+    display: flex;
+    gap: 8px;
+}
+
+.ranges-add .input {
+    flex: 1;
+    max-width: 260px;
+}
+
+/* Network / VLAN reported by UniFi */
+.network-name-badge {
+    margin-top: 2px;
+    font-size: 0.7rem;
+    color: var(--text-tertiary);
+    font-family: var(--font);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.setting-item[hidden] {
+    display: none !important;
+}
+
+.text-success { color: var(--success) !important; }
+.text-danger { color: var(--danger) !important; }
+
+/* =========================================
+   Inventory
+   ========================================= */
+.inventory-help {
+    margin-top: 12px;
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+}
+
+.inventory-card {
+    padding: 0;
+    overflow: hidden;
+}
+
+.inventory-table-wrap {
+    overflow-x: auto;
+}
+
+.inventory-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.inventory-table th {
+    text-align: left;
+    padding: 12px 14px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-tertiary);
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+}
+
+.inventory-table th.sorted { color: var(--accent); }
+.inventory-table th[data-dir="asc"]::after { content: ' \25B2'; font-size: 0.6rem; }
+.inventory-table th[data-dir="desc"]::after { content: ' \25BC'; font-size: 0.6rem; }
+
+.inventory-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-light);
+    color: var(--text-primary);
+    vertical-align: middle;
+}
+
+.inventory-table tbody tr {
+    cursor: pointer;
+    transition: background var(--transition);
+}
+
+.inventory-table tbody tr:hover { background: var(--bg-hover); }
+.inventory-table tbody tr.retired td { opacity: 0.55; }
+.inventory-table .num { text-align: right; white-space: nowrap; }
+.inventory-table td.mono { font-size: 0.8rem; }
+
+.inv-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 160px;
+}
+
+.inv-name > i.legacy-icon {
+    font-size: 1.1rem;
+    color: var(--accent);
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-xs);
+    background: var(--accent-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.inv-title { font-weight: 600; }
+.inv-title .device-badge { margin-left: 6px; vertical-align: middle; }
+.inv-sub { font-size: 0.7rem; color: var(--text-tertiary); font-family: var(--font); margin-top: 2px; }
+.inv-muted { color: var(--text-tertiary); }
+.inv-net { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.inv-actions { color: var(--text-tertiary); text-align: right; }
+
+.inv-warranty-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 50px;
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.inv-warranty-badge.soon { background: var(--warning-light); color: var(--warning-text); }
+.inv-warranty-badge.expired { background: var(--danger-light); color: var(--danger-text); }
+
+.inventory-link-info {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    margin-bottom: 16px;
+}
+
+.inventory-link-info i { color: var(--accent); margin-right: 4px; }
+.inventory-link-info[hidden], .inv-net-fields[hidden] { display: none !important; }
+
+.inv-warranty-quick { display: flex; gap: 6px; margin-top: 6px; }
+
+.print-header { display: none; }
+
+/* Manufacturer logos */
+.inv-logo {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-xs);
+    background: #fff;
+    border: 1px solid var(--border);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.inv-logo img {
+    width: 70%;
+    height: 70%;
+    object-fit: contain;
+}
+
+.inv-logo > i { display: none; font-size: 1.1rem; color: var(--accent); }
+.inv-logo.fallback { background: var(--accent-light); border-color: transparent; }
+.inv-logo.fallback img { display: none; }
+.inv-logo.fallback > i { display: block; }
+
+.inv-logo-lg { width: 56px; height: 56px; }
+.inv-logo-lg > i { font-size: 1.6rem; }
+
+.inv-logo-editor {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 16px;
+}
+
+.inv-logo-editor-title { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); }
+.inv-logo-editor-actions { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.inv-logo-editor-actions [hidden] { display: none !important; }
+
+/* Virtual assets */
+.inv-kind-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 50px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    font-family: var(--font);
+    text-transform: uppercase;
+    background: var(--info-light);
+    color: var(--info);
+    vertical-align: middle;
+}
+.inv-kind-badge.lxc { background: var(--accent-light); color: var(--accent-hover); }
+.inv-kind-badge.docker { background: var(--success-light); color: var(--success-text); }
+#inventoryModal .form-group[hidden], #inventoryModal .form-row[hidden] { display: none !important; }
+
+/* Net Alert bulk selection */
+.col-select {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.col-select input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--accent);
+}
+
+.device-card.selected {
+    border-color: var(--accent);
+    background: var(--accent-light);
+}
+
+.bulk-bar {
+    position: sticky;
+    top: calc(var(--topbar-height) + 8px);
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px 16px;
+    margin-bottom: 12px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-md);
+}
+
+.bulk-count { font-size: 0.85rem; color: var(--text-primary); white-space: nowrap; }
+.bulk-count i { color: var(--accent); }
+.bulk-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bulk-location { display: flex; gap: 4px; }
+.bulk-bar .select-sm, .bulk-bar .input-sm { height: 32px; padding: 4px 10px; font-size: 0.8rem; width: auto; min-width: 0; }
+.bulk-bar .input-sm { width: 150px; }
+
+#confirmMessage { white-space: pre-line; }
+
+/* Column configurator */
+.modal.modal-sm { max-width: 460px; }
+.colcfg-help { font-size: 0.8rem; color: var(--text-tertiary); margin-bottom: 10px; }
+.colcfg-list { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.colcfg-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    background: var(--bg-secondary);
+    user-select: none;
+}
+.colcfg-item.off { opacity: 0.55; }
+.colcfg-item.dragging { opacity: 0.4; border-style: dashed; border-color: var(--accent); }
+.colcfg-handle { cursor: grab; color: var(--text-tertiary); font-size: 1.1rem; }
+.colcfg-label { flex: 1; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: var(--text-primary); margin: 0; }
+.colcfg-label input { accent-color: var(--accent); width: 15px; height: 15px; }
+.colcfg-label small { color: var(--text-tertiary); }
+.colcfg-move {
+    border: none;
+    background: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: var(--radius-xs);
+    font-size: 1rem;
+}
+.colcfg-move:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* Manufacturer logo in Net Alert */
+.inv-logo.device-logo { width: 34px; height: 34px; }
+.device-card.offline .inv-logo:not(.fallback) img { opacity: 0.55; filter: grayscale(0.5); }
+/* Icon without logo: yellow = new, green = saved online, red = saved offline */
+.inv-logo.device-logo.fallback.state-new { background: var(--accent-light); }
+.inv-logo.device-logo.fallback.state-new > i { color: var(--accent); }
+.inv-logo.device-logo.fallback.state-online { background: var(--success-light); }
+.inv-logo.device-logo.fallback.state-online > i { color: var(--success); }
+.inv-logo.device-logo.fallback.state-offline { background: var(--danger-light); }
+.inv-logo.device-logo.fallback.state-offline > i { color: var(--danger); }
+
+/* Automatic "what could it be" hints */
+.device-description.device-hint { font-style: italic; color: var(--text-tertiary); }
+.device-description.device-hint i { color: var(--accent); font-style: normal; }
+.form-hint { display: block; margin-top: 4px; font-size: 0.75rem; color: var(--text-tertiary); }
+.form-hint[hidden] { display: none; }
+.form-hint i { color: var(--accent); }
+
+/* Net Alert stat cards used as filters */
+.stat-card.stat-filter { cursor: pointer; user-select: none; }
+.stat-card.stat-filter:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.stat-card.stat-filter.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), var(--shadow-md);
+}
+.stat-card.stat-filter.active .stat-label { color: var(--accent); }
+
+@media print {
+    .sidebar, .sidebar-overlay, .topbar, .no-print, .toast-container, .modal-overlay { display: none !important; }
+    .main-content { margin-left: 0 !important; }
+    .page { padding: 0 !important; animation: none !important; }
+    body { background: #fff !important; }
+    #page-inventory .stats-row { display: none !important; }
+    #page-inventory .print-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 12px;
+        color: #000;
+    }
+    .inventory-card { border: none !important; box-shadow: none !important; }
+    .inventory-table { font-size: 9pt; color: #000; }
+    .inventory-table th, .inventory-table td { padding: 5px 6px; color: #000 !important; background: none !important; }
+    .inventory-table th::after { content: '' !important; }
+    .inventory-table tbody tr.retired td { opacity: 1; text-decoration: line-through; }
+    .inventory-table tr { page-break-inside: avoid; }
+    .inv-logo { border: none; }
+    @page { size: A4 landscape; margin: 12mm; }
+}
+
+.inventory-table td.inv-wrap { max-width: 260px; white-space: normal; font-size: 0.8rem; color: var(--text-secondary); }

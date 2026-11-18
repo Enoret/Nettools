@@ -120,6 +120,7 @@ const Router = {
             speed: { icon: 'ri-speed-up-line', text: 'Net Speed' },
             netcheck: { icon: 'ri-shield-check-line', text: 'Net Check' },
             network: { icon: 'ri-radar-line', text: 'Net Alert' },
+            inventory: { icon: 'ri-archive-drawer-line', text: 'Inventario' },
             settings: { icon: 'ri-settings-3-line', text: 'Ajustes' },
         };
         const titleInfo = titles[page] || titles.speed;
@@ -146,6 +147,7 @@ const Router = {
         if (page === 'netcheck') NetCheckPage.init();
         if (page === 'network') NetworkPage.init();
         if (page === 'settings') SettingsPage.init();
+        if (page === 'inventory') InventoryPage.init();
     }
 };
 
@@ -312,6 +314,29 @@ const Utils = {
             other: 'Dispositivo',
         };
         return names[type] || 'Dispositivo';
+    },
+
+    /** Numeric sort key for an IPv4 address, or null if there is none. */
+    ipSortKey(ip) {
+        const parts = (ip || '').trim().split('.');
+        if (parts.length !== 4 || parts.some(p => !/^\d{1,3}$/.test(p))) return null;
+        return parts.reduce((acc, p) => acc * 256 + Number(p), 0);
+    },
+
+    /** Bumped when a custom logo is uploaded/removed, to refresh cached images. */
+    logoVersion: Date.now(),
+
+    /**
+     * Manufacturer logo tile (falls back to the device type icon when the
+     * brand is empty or has no logo).
+     */
+    logoTile(brand, icon, extraClass = '') {
+        const fallback = `<i class="${icon}"></i>`;
+        if (!brand) return `<span class="inv-logo fallback ${extraClass}">${fallback}</span>`;
+        const safe = String(brand).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+        return `<span class="inv-logo ${extraClass}" title="${safe}">` +
+               `<img src="${API.logos.url(brand, this.logoVersion)}" alt="" loading="lazy" ` +
+               `onerror="this.parentNode.classList.add('fallback')">${fallback}</span>`;
     },
 
     debounce(fn, delay = 300) {

@@ -24,16 +24,19 @@
 
 ### Key Features
 
-- Automatic and manual speed tests with **Ookla Speedtest CLI**
-- Local network device discovery with **arp-scan** and **nmap**
+- Automatic and manual speed tests (**speedtest-cli**, Speedtest.net servers), gauges up to 1 Gbps
+- Network device discovery with **arp-scan** (local subnets, auto-detected) and **nmap** (extra routed ranges / VLANs)
+- MAC vendor lookup (Wireshark OUI database), IP changes followed by MAC, device merge for private/random MACs
+- Per-device **port scan** (quick / full with service versions) and a **daily automatic port scan** of the whole network
+- **UniFi integration** (API key or local account): client names, MACs and VLANs straight from your UniFi console
+- **Inventory**: asset sheets for saved devices (model, serial number, purchase, warranty...) with manufacturer logos, CSV export and print view
 - Diagnostic tools: **Ping**, **Traceroute** and **NSLookup**
-- **Telegram** notifications when new devices are detected
+- **Telegram** notifications: new devices, scheduled speed test results, opened/closed ports
+- Automatic cleanup of stale unsaved devices and configurable data retention
 - Interactive charts with speed, latency and device history
-- Light, dark and auto themes
-- Customizable accent colors
-- Configurable timezone
+- Light, dark and auto themes, customizable accent colors, configurable timezone
 - Full REST API
-- No cloud dependencies - everything runs on your server
+- Self-hosted: your data never leaves your server (only brand names are sent to Simple Icons / Google to fetch manufacturer logos)
 
 ---
 
@@ -235,4 +238,4 @@ MIT License
 
 ---
 
-Developed by [bytebeat.es](https://bytebeat.es)
+Developed by [braut.es](https://braut.es)

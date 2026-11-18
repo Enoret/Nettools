@@ -2,6 +2,8 @@
 NetTools - Telegram Notification Service
 """
 
+import html
+import json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -75,7 +77,7 @@ def send_new_device_alert(bot_token: str, chat_id: str, devices: list) -> bool:
     for d in devices:
         name = d.get('hostname') or d.get('ip_address') or 'Desconocido'
         ip = d.get('ip_address', '-')
-        mac = d.get('mac_address', '-')
+        mac = d.get('mac_address') or 'sin MAC (red enrutada)'
         brand = d.get('brand', '')
         dtype = d.get('device_type', 'other')
 
@@ -92,6 +94,87 @@ def send_new_device_alert(bot_token: str, chat_id: str, devices: list) -> bool:
 
     result = send_telegram_message(bot_token, chat_id, message)
     return result.get("success", False)
+
+
+def send_port_changes_alert(bot_token: str, chat_id: str, changes: list) -> bool:
+    """Ports opened/closed since the previous scan, per device.
+    `changes`: [{name, ip, new_ports: [{port, service}], closed_ports: [...]}]"""
+    if not changes:
+        return True
+
+    def fmt(p):
+        svc = p.get('service') or ''
+        return f"{p['port']}" + (f" ({html.escape(svc)})" if svc else '')
+
+    lines = [f"🚪 <b>NetTools - Cambios en puertos abiertos</b>"]
+    for c in changes:
+        lines.append(f"\n📡 <b>{html.escape(c['name'] or '')}</b> <code>{html.escape(c['ip'] or '')}</code>")
+        if c['new_ports']:
+            lines.append("   🆕 Abiertos: " + ", ".join(fmt(p) for p in c['new_ports']))
+        if c['closed_ports']:
+            lines.append("   ✖️ Cerrados: " + ", ".join(fmt(p) for p in c['closed_ports']))
+    result = send_telegram_message(bot_token, chat_id, "\n".join(lines))
+    return result.get("success", False)
+
+
+def _fmt_delta(value, avg) -> str:
+    """' (+3% vs media 7d)' or '' when there is no average."""
+    if value is None or not avg:
+        return ''
+    pct = (value - avg) / avg * 100
+    return f" <i>({pct:+.0f}% vs media 7d)</i>"
+
+
+def send_speed_test_result(bot_token: str, chat_id: str, result: dict,
+                           averages: dict = None, threshold: float = 0) -> bool:
+    """Send the result of a scheduled speed test."""
+    averages = averages or {}
+    dl = result.get('download_speed') or 0
+    ul = result.get('upload_speed') or 0
+    slow = threshold and (dl < threshold or ul < threshold)
+
+    title = "⚠️ <b>NetTools - Velocidad por debajo de lo esperado</b>" if slow \
+        else "📶 <b>NetTools - Test de velocidad</b>"
+    lines = [
+        title,
+        "",
+        f"⬇️ Descarga: <b>{dl:.1f} Mbps</b>{_fmt_delta(dl, averages.get('download'))}",
+        f"⬆️ Subida: <b>{ul:.1f} Mbps</b>{_fmt_delta(ul, averages.get('upload'))}",
+        f"⏱ Ping: {result.get('ping') or 0:.1f} ms · Jitter: {result.get('jitter') or 0:.1f} ms",
+    ]
+
+    raw = result.get('raw_data')
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except ValueError:
+            raw = {}
+    raw = raw or {}
+    loss = raw.get('packetLoss')
+    if loss:
+        lines.append(f"📉 Perdida de paquetes: {loss:.1f}%")
+
+    server = result.get('server_location') or result.get('server_name')
+    if server:
+        lines.append(f"🌐 Servidor: {html.escape(str(server))}")
+    if result.get('isp'):
+        lines.append(f"🏢 ISP: {html.escape(str(result['isp']))}")
+    if slow:
+        lines.append(f"\nUmbral configurado: {threshold:.0f} Mbps")
+
+    url = (raw.get('result') or {}).get('url')
+    if url:
+        lines.append(f'\n<a href="{html.escape(url)}">Ver resultado en Speedtest</a>')
+
+    return send_telegram_message(bot_token, chat_id, "\n".join(lines)).get('success', False)
+
+
+def send_speed_test_failure(bot_token: str, chat_id: str, error: str) -> bool:
+    message = (
+        "❌ <b>NetTools - Test de velocidad fallido</b>\n\n"
+        f"El test programado no se ha podido completar:\n<code>{html.escape(str(error))[:500]}</code>"
+    )
+    return send_telegram_message(bot_token, chat_id, message).get('success', False)
 
 
 def test_connection(bot_token: str, chat_id: str) -> dict:

@@ -1,0 +1,24 @@
+# =========================================
+#  NetTools - Development instance
+#  Builds from local source; own volume, never touches production data.
+#
+#    docker compose -f docker-compose.dev.yml up -d --build
+# =========================================
+
+services:
+  nettools-dev:
+    build: .
+    image: nettools:dev
+    container_name: nettools-dev
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - nettools-dev-data:/data
+    environment:
+      - TZ=Europe/Madrid
+      - NETTOOLS_PORT=7070
+      - NETTOOLS_BACKEND_PORT=7071
+
+volumes:
+  nettools-dev-data:
+    driver: local

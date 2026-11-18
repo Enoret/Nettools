@@ -25,6 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nmap \
     iputils-ping \
     net-tools \
+    iproute2 \
     traceroute \
     dnsutils \
     curl \
@@ -46,6 +47,13 @@ RUN curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/scr
     speedtest --version && \
     echo "Ookla Speedtest CLI installed"
 
+# Up-to-date MAC vendor database (Wireshark manuf). Optional: if the download
+# fails the backend falls back to arp-scan's bundled ieee-oui.txt.
+RUN mkdir -p /usr/share/nettools && \
+    (curl -fsSL -m 120 https://www.wireshark.org/download/automated/data/manuf -o /usr/share/nettools/manuf \
+     && echo "MAC vendor database: $(grep -vc '^#' /usr/share/nettools/manuf) entries" \
+     || (rm -f /usr/share/nettools/manuf; echo "WARNING: manuf download failed, using arp-scan OUI file"))
+
 # Setup backend
 WORKDIR /app
 COPY docker/backend/*.py .
@@ -53,6 +61,10 @@ COPY docker/backend/requirements.txt .
 
 # Setup frontend
 COPY nettools/ /usr/share/nginx/html/
+# Make static files readable by nginx regardless of host file permissions
+RUN chmod -R a+rX /usr/share/nginx/html
+# Cache busting: index.html references JS/CSS with ?v=<build timestamp>
+RUN sed -i "s/__BUILD__/$(date +%s)/g" /usr/share/nginx/html/index.html
 
 # Nginx configuration (template - port replaced at runtime by entrypoint)
 COPY docker/nginx/nginx.conf /etc/nginx/conf.d/default.conf.template

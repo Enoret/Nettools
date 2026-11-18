@@ -62,15 +62,10 @@ const NetCheckPage = {
             btn.addEventListener('click', () => {
                 const target = btn.dataset.target;
                 if (target === 'gateway') {
-                    const range = document.getElementById('networkRange');
-                    if (range) {
-                        const ip = range.value.replace(/\/\d+$/, '').replace(/\.\d+$/, '.1');
+                    this.getGateway().then(ip => {
                         document.getElementById('tracerouteInput').value = ip;
                         this.runTraceroute(ip);
-                    } else {
-                        document.getElementById('tracerouteInput').value = '192.168.1.1';
-                        this.runTraceroute('192.168.1.1');
-                    }
+                    });
                 } else {
                     document.getElementById('tracerouteInput').value = target;
                     this.runTraceroute(target);
@@ -107,6 +102,18 @@ const NetCheckPage = {
         });
     },
 
+    /** Default gateway of the server, or x.x.x.1 of its first network. */
+    async getGateway() {
+        try {
+            const info = await API.network.info();
+            if (info.gateway) return info.gateway;
+            if (info.local_networks.length) {
+                return info.local_networks[0].cidr.replace(/\/\d+$/, '').replace(/\.\d+$/, '.1');
+            }
+        } catch { /* fall through */ }
+        return '192.168.1.1';
+    },
+
     // ==========================================
     //  PING
     // ==========================================
@@ -120,7 +127,7 @@ const NetCheckPage = {
         card.innerHTML = `
             <div class="ping-status-dot" style="background:var(--text-tertiary);"></div>
             <div class="ping-result-info">
-                <div class="ping-result-ip">${ip}</div>
+                <div class="ping-result-ip">${this.escapeHtml(ip)}</div>
                 <div class="ping-result-name">Pinging...</div>
             </div>
             <div class="ping-result-latency" style="color:var(--text-tertiary)">
@@ -132,13 +139,8 @@ const NetCheckPage = {
         try {
             const result = await API.ping.single(ip);
             this.updatePingCard(card, result);
-        } catch {
-            const latency = Math.random() > 0.2 ? (Math.random() * 50 + 1).toFixed(1) : null;
-            this.updatePingCard(card, {
-                ip,
-                is_reachable: latency !== null,
-                latency: latency ? parseFloat(latency) : null,
-            });
+        } catch (err) {
+            this.updatePingCard(card, { ip, is_reachable: false, latency: null, error: err.message });
         }
     },
 
@@ -152,11 +154,11 @@ const NetCheckPage = {
         card.innerHTML = `
             <div class="ping-status-dot ${reachable ? 'reachable' : 'unreachable'}"></div>
             <div class="ping-result-info">
-                <div class="ping-result-ip">${result.ip}</div>
-                <div class="ping-result-name">${result.name || (reachable ? 'Alcanzable' : 'No responde')}</div>
+                <div class="ping-result-ip">${this.escapeHtml(result.ip)}</div>
+                <div class="ping-result-name">${this.escapeHtml(result.error ? `Error: ${result.error}` : (result.name || (reachable ? 'Alcanzable' : 'No responde')))}</div>
             </div>
             <div class="ping-result-latency ${reachable ? latencyClass : 'bad'}">
-                ${reachable ? `${latency.toFixed(1)} ms` : 'Timeout'}
+                ${reachable ? (latency != null ? `${latency.toFixed(1)} ms` : 'OK') : (result.error ? 'Error' : 'Timeout')}
             </div>
         `;
     },
@@ -178,8 +180,8 @@ const NetCheckPage = {
                 this.pingIP(device.ip_address);
                 await new Promise(r => setTimeout(r, 200));
             }
-        } catch {
-            Toast.error('Error al obtener dispositivos');
+        } catch (err) {
+            Toast.error(`Error al obtener dispositivos: ${err.message}`);
         }
     },
 

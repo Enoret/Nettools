@@ -31,16 +31,19 @@
 
 ### Key Features
 
-- Automatic and manual speed tests with **Ookla Speedtest CLI**
-- Local network device discovery with **arp-scan** and **nmap**
+- Automatic and manual speed tests (**speedtest-cli**, Speedtest.net servers), gauges up to 1 Gbps
+- Network device discovery with **arp-scan** (local subnets, auto-detected) and **nmap** (extra routed ranges / VLANs)
+- MAC vendor lookup (Wireshark OUI database), IP changes followed by MAC, device merge for private/random MACs
+- Per-device **port scan** (quick / full with service versions) and a **daily automatic port scan** of the whole network
+- **UniFi integration** (API key or local account): client names, MACs and VLANs straight from your UniFi console
+- **Inventory**: asset sheets for saved devices (model, serial number, purchase, warranty...) with manufacturer logos, CSV export and print view
 - Diagnostic tools: **Ping**, **Traceroute** and **NSLookup**
-- **Telegram** notifications when new devices are detected
+- **Telegram** notifications: new devices, scheduled speed test results, opened/closed ports
+- Automatic cleanup of stale unsaved devices and configurable data retention
 - Interactive charts with speed, latency and device history
-- Light, dark and auto themes
-- Customizable accent colors
-- Configurable timezone
+- Light, dark and auto themes, customizable accent colors, configurable timezone
 - Full REST API
-- No cloud dependencies - everything runs on your server
+- Self-hosted: your data never leaves your server (only brand names are sent to Simple Icons / Google to fetch manufacturer logos)
 
 ---
 
@@ -48,6 +51,8 @@
 
 ### Net Speed
 - Manual speed test with server selection
+- Gauges up to 1 Gbps
+- Telegram message with the result of scheduled tests (always, or only below a threshold)
 - Scheduled automatic tests (15 min - 24 h)
 - Speed history charts (download/upload)
 - Latency charts (ping/jitter)
@@ -56,16 +61,26 @@
 - Statistics: best download, best upload, best ping, total tests
 
 ### Net Alert
-- Automatic local network scan (arp-scan + nmap)
-- New device detection
-- Manufacturer identification by MAC address
-- Device editing: name, type, location, description
-- Static IP or DHCP tagging
-- Filters: all, online, offline, new, saved, manual
-- Sort by name, IP, MAC, manufacturer, location, status
-- Connected devices history (chart)
-- Telegram notifications for new devices
-- Quick ping from device card
+- Automatic network scan: local subnets auto-detected (arp-scan), extra ranges / VLANs (nmap ping scan)
+- New device detection and Telegram notifications
+- Manufacturer identification by MAC (Wireshark OUI database) and **manufacturer logos**
+- Automatic **"what could it be" hint** for new devices (vendor, hostname, open ports, private MAC)
+- IP changes followed by MAC (the old IP is released), private / random MAC badge, **merge** of duplicated devices
+- **Port scan** per device (quick / full with service versions), service icons in the list, daily automatic port scan with Telegram alerts on opened/closed ports
+- **UniFi integration**: names, MACs and VLANs of every client from your UniFi console
+- **Bulk actions**: select several devices (shift+click ranges) to delete, save, set type or location
+- **Configurable columns**: choose, reorder (drag & drop) and set the default sort
+- Stat cards (total / online / offline / new) work as filters, plus filters for saved and manual devices
+- Automatic cleanup of unsaved devices without IP not seen for N days
+- Connected devices history (chart), quick ping from the device list
+
+### Inventory
+- Saved and manual devices are added automatically; the sheet survives if the device is deleted from Net Alert
+- Asset sheet: model, serial number, purchase date and price, warranty, supplier, notes, in use / retired
+- Physical or virtual assets (VM, LXC, Docker) with VMID/CTID and host
+- Items that are not on the network can be added by hand
+- Manufacturer logos (automatic or uploaded), warranty expiry badges, total value
+- Configurable columns, CSV export (Excel) and print / PDF view
 
 ### Net Check
 - **Ping**: single IP or all saved devices
@@ -75,10 +90,13 @@
 ### Settings
 - Automatic test frequency
 - Network scan frequency
-- Network range (CIDR)
+- Networks to scan: local subnet (auto) + extra ranges / VLANs
+- Daily port scan (hour, quick / full, all or saved devices)
+- UniFi integration (API key or local account)
+- Cleanup of stale unsaved devices
 - History retention
 - Timezone
-- Telegram notifications (bot token + chat ID + connection test)
+- Telegram notifications (bot token + chat ID + connection test): new devices, scheduled speed tests, port changes
 - Color customization (accent, background, download, upload)
 - Data export (JSON)
 - History and device cleanup
@@ -395,7 +413,7 @@ MIT License - see [LICENSE](LICENSE)
 
 ## Credits
 
-Developed by [bytebeat.es](https://bytebeat.es)
+Developed by [braut.es](https://braut.es)
 
 <p align="center">
   <sub>NetTools - Self-hosted network monitor</sub>

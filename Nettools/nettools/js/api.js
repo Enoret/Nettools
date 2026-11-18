@@ -112,6 +112,35 @@ const API = {
         async getHistory(params = {}) {
             const query = new URLSearchParams(params).toString();
             return API.request(`/devices/history${query ? '?' + query : ''}`);
+        },
+
+        async getPorts(id) {
+            return API.request(`/devices/${id}/ports`);
+        },
+
+        async merge(targetId, sourceId) {
+            return API.request(`/devices/${targetId}/merge`, {
+                method: 'POST',
+                body: JSON.stringify({ source_id: sourceId }),
+            });
+        },
+
+        async scanPorts(id, profile = 'quick') {
+            return API.request(`/devices/${id}/ports/scan`, {
+                method: 'POST',
+                body: JSON.stringify({ profile }),
+            });
+        }
+    },
+
+    // --- Network ranges ---
+    network: {
+        async info() {
+            return API.request('/network/info');
+        },
+
+        async check(cidr) {
+            return API.request(`/network/check?cidr=${encodeURIComponent(cidr)}`);
         }
     },
 
@@ -161,6 +190,43 @@ const API = {
         }
     },
 
+    // --- Bulk device changes ---
+    async bulkDevices(data) {
+        return API.request('/devices/bulk', { method: 'POST', body: JSON.stringify(data) });
+    },
+
+    // --- Inventory ---
+    inventory: {
+        async list() {
+            return API.request('/inventory');
+        },
+        async create(data) {
+            return API.request('/inventory', { method: 'POST', body: JSON.stringify(data) });
+        },
+        async update(id, data) {
+            return API.request(`/inventory/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+        },
+        async remove(id) {
+            return API.request(`/inventory/${id}`, { method: 'DELETE' });
+        },
+    },
+
+    // --- Manufacturer logos ---
+    logos: {
+        url(brand, version = '') {
+            return `${API_BASE}/logos?brand=${encodeURIComponent(brand)}${version ? '&v=' + version : ''}`;
+        },
+        async info(brand) {
+            return API.request(`/logos/info?brand=${encodeURIComponent(brand)}`);
+        },
+        async upload(brand, dataUrl) {
+            return API.request('/logos', { method: 'POST', body: JSON.stringify({ brand, data_url: dataUrl }) });
+        },
+        async remove(brand) {
+            return API.request(`/logos?brand=${encodeURIComponent(brand)}`, { method: 'DELETE' });
+        },
+    },
+
     // --- Settings ---
     settings: {
         async getAll() {
@@ -176,6 +242,21 @@ const API = {
 
         async testTelegram() {
             return API.request('/settings/telegram/test', { method: 'POST' });
+        },
+
+        async scanAllPorts() {
+            return API.request('/ports/scan-all', { method: 'POST' });
+        },
+
+        async scanAllPortsStatus() {
+            return API.request('/ports/scan-all/status');
+        },
+
+        async testUnifi(data) {
+            return API.request('/settings/unifi/test', {
+                method: 'POST',
+                body: JSON.stringify(data || {}),
+            });
         }
     },
 

@@ -2,6 +2,9 @@
    NetTools - Speed Test Page
    ========================================= */
 
+// Full-scale value of the download/upload gauges (Mbps)
+const GAUGE_MAX_MBPS = 1000;
+
 const SpeedTestPage = {
     chartsInitialized: false,
     gaugeDownload: null,
@@ -113,7 +116,7 @@ const SpeedTestPage = {
     initGauges() {
         const colors = Theme.getColors();
 
-        const gaugeOptions = (color, max = 500) => ({
+        const gaugeOptions = (color) => ({
             chart: { type: 'radialBar', height: 120, sparkline: { enabled: true } },
             plotOptions: {
                 radialBar: {
@@ -154,7 +157,7 @@ const SpeedTestPage = {
         this.gaugeUpload.render();
     },
 
-    updateGauge(gauge, value, max = 500) {
+    updateGauge(gauge, value, max = GAUGE_MAX_MBPS) {
         const pct = Math.min((value / max) * 100, 100);
         gauge.updateSeries([Math.round(pct)]);
     },
@@ -341,8 +344,8 @@ const SpeedTestPage = {
             ]);
             this.updateDashboard(results, stats);
         } catch (err) {
-            // Use demo data if API not available
-            this.loadDemoData();
+            console.error('Error loading speed test data:', err);
+            Toast.error(`No se pudieron cargar los datos: ${err.message}`);
         }
     },
 
@@ -385,6 +388,22 @@ const SpeedTestPage = {
 
             // Recent tests table
             this.updateRecentTable(results.slice(-20).reverse());
+        } else {
+            // No tests in the selected range: clear charts and table
+            this.chartHistory.updateSeries([
+                { name: 'Descarga', data: [] },
+                { name: 'Subida', data: [] },
+            ]);
+            this.chartPing.updateSeries([
+                { name: 'Ping', data: [] },
+                { name: 'Jitter', data: [] },
+            ]);
+            this.chartHourly.updateOptions({ xaxis: { categories: [] } });
+            this.chartHourly.updateSeries([
+                { name: 'Descarga', data: [] },
+                { name: 'Subida', data: [] },
+            ]);
+            this.updateRecentTable([]);
         }
     },
 
@@ -482,10 +501,11 @@ const SpeedTestPage = {
             { text: 'Finalizando...', pct: 100 },
         ];
 
+        let phaseInterval = null;
         try {
             // Simulate phases for UI while waiting for backend
             let phaseIdx = 0;
-            const phaseInterval = setInterval(() => {
+            phaseInterval = setInterval(() => {
                 if (phaseIdx < phases.length) {
                     phase.textContent = phases[phaseIdx].text;
                     const offset = circumference - (phases[phaseIdx].pct / 100) * circumference;
@@ -521,10 +541,9 @@ const SpeedTestPage = {
             // Reload all data
             this.loadData();
         } catch (err) {
+            clearInterval(phaseInterval);
             phase.textContent = 'Error en el test';
             Toast.error(`Error: ${err.message}`);
-            // Show demo result
-            this.simulateTest(phases, circumference, progress, phase);
         } finally {
             setTimeout(() => {
                 this.isTesting = false;
@@ -537,65 +556,6 @@ const SpeedTestPage = {
             }, 3000);
         }
     },
-
-    // Demo simulation for when backend is not available
-    async simulateTest(phases, circumference, progress, phase) {
-        for (let i = 0; i < phases.length; i++) {
-            phase.textContent = phases[i].text;
-            const offset = circumference - (phases[i].pct / 100) * circumference;
-            progress.style.strokeDashoffset = offset;
-
-            // Simulate speed values during test
-            if (i === 2) {
-                const dl = (Math.random() * 200 + 50).toFixed(1);
-                document.getElementById('downloadValue').textContent = dl;
-                this.updateGauge(this.gaugeDownload, parseFloat(dl));
-            }
-            if (i === 3) {
-                const ul = (Math.random() * 100 + 20).toFixed(1);
-                document.getElementById('uploadValue').textContent = ul;
-                this.updateGauge(this.gaugeUpload, parseFloat(ul));
-            }
-
-            await new Promise(r => setTimeout(r, 2000));
-        }
-
-        const ping = (Math.random() * 20 + 5).toFixed(1);
-        const jitter = (Math.random() * 5 + 1).toFixed(1);
-        document.getElementById('livePing').textContent = `${ping} ms`;
-        document.getElementById('liveJitter').textContent = `${jitter} ms`;
-        document.getElementById('liveServer').textContent = 'Demo Server';
-        document.getElementById('liveISP').textContent = 'Local ISP';
-
-        phase.textContent = 'Test completado! (Demo)';
-    },
-
-    // --- Demo Data ---
-    loadDemoData() {
-        const now = Date.now();
-        const results = [];
-        for (let i = 23; i >= 0; i--) {
-            results.push({
-                timestamp: new Date(now - i * 3600000).toISOString(),
-                download_speed: 80 + Math.random() * 120,
-                upload_speed: 30 + Math.random() * 60,
-                ping: 8 + Math.random() * 25,
-                jitter: 1 + Math.random() * 8,
-                server_name: 'Servidor Local',
-                isp: 'ISP Demo',
-            });
-        }
-
-        const stats = {
-            best_download: Math.max(...results.map(r => r.download_speed)),
-            best_upload: Math.max(...results.map(r => r.upload_speed)),
-            best_ping: Math.min(...results.map(r => r.ping)),
-            total_tests: results.length,
-        };
-
-        this.updateDashboard(results, stats);
-    },
-
 };
 
 // CSS animation for spinner
