@@ -77,7 +77,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="NetTools API",
     description="API para monitoreo de red y tests de velocidad",
-    version="1.3.0",
+    version="1.3.1",
     lifespan=lifespan,
 )
 
